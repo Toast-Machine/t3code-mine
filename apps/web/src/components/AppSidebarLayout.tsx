@@ -304,12 +304,13 @@ export function AppSidebarLayout({ children }: { children: ReactNode }) {
   });
   const sidebarProviderStyle = {
     // Shell geometry. The top bar spans the window (holding the macOS window
-    // buttons, centered over the rail); the rail owns the left gutter up to the
+    // buttons); the rail owns the left gutter up to the
     // panel, so its icons center by layout alone; its first and last icons sit
     // the same distance inside the panel's top and bottom edges. The desktop app mirrors these numbers in
     // macosWindowButtonPosition.
     "--app-topbar-height": "2.25rem",
-    "--app-topbar-start": isMacosDesktop && !isWindowFullscreen ? "5rem" : "0.75rem",
+    // After the macOS window buttons (18pt in, 54pt wide) with a 24pt gap.
+    "--app-topbar-start": isMacosDesktop && !isWindowFullscreen ? "6rem" : "1rem",
     "--app-rail-width": "4.5rem",
     "--app-rail-inset": "1rem",
     "--workspace-controls-top": "var(--app-topbar-height)",

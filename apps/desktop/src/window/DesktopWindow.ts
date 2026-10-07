@@ -34,19 +34,17 @@ import { makeQuitShortcutHandler } from "./QuitHold.ts";
 const TITLEBAR_HEIGHT = 40;
 // Native macOS buttons are 14 points tall and do not scale with the renderer's zoom.
 const MACOS_WINDOW_BUTTON_RADIUS = 7;
-// Personal build: the window buttons sit in the app's top bar, centered over the
-// app rail (4.5rem wide) and vertically between the window top and the panel
-// (the 2.25rem bar plus the panel's 0.5rem margin), like the bar's controls.
-// Mirrors --app-topbar-height and --app-rail-width in the web app. The three
-// buttons span 54pt (14pt each at a 20pt pitch).
+// Personal build: the window buttons sit in the app's top bar, 18pt from the left
+// edge and vertically between the window top and the panel (the 2.25rem bar plus
+// the panel's 0.5rem margin), like the bar's controls. Mirrors
+// --app-topbar-height and --app-topbar-start in the web app.
 const MACOS_APP_TOPBAR_HEIGHT = 36;
 const MACOS_PANEL_TOP_MARGIN = 8;
-const MACOS_APP_RAIL_WIDTH = 72;
-const MACOS_WINDOW_BUTTONS_WIDTH = 54;
+const MACOS_WINDOW_BUTTONS_LEFT = 18;
 
 function macosWindowButtonPosition(zoom: number): { x: number; y: number } {
   return {
-    x: Math.round((MACOS_APP_RAIL_WIDTH * zoom - MACOS_WINDOW_BUTTONS_WIDTH) / 2),
+    x: MACOS_WINDOW_BUTTONS_LEFT,
     y: Math.round(
       ((MACOS_APP_TOPBAR_HEIGHT + MACOS_PANEL_TOP_MARGIN) * zoom) / 2 - MACOS_WINDOW_BUTTON_RADIUS,
     ),
