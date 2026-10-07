@@ -4,7 +4,7 @@ import * as NodeOS from "node:os";
 import * as NodePath from "node:path";
 
 import { assert, describe, it } from "@effect/vitest";
-import { ProviderDriverKind, ProviderInstanceId } from "@t3tools/contracts";
+import { ProviderDriverKind, ProviderInstanceId, type ServerProvider } from "@t3tools/contracts";
 import { HostProcessPlatform } from "@t3tools/shared/hostProcess";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
@@ -23,6 +23,7 @@ function instance(id: string, library: ProviderSkillLibrary): ProviderInstance {
     displayName: id,
     continuationIdentity: { driverKind: ProviderDriverKind.make(id), continuationKey: id },
     skillLibrary: library,
+    snapshotForCwd: () => Effect.die("unused"),
     get adapter(): never {
       throw new Error("unused");
     },
@@ -35,7 +36,9 @@ function instance(id: string, library: ProviderSkillLibrary): ProviderInstance {
   };
 }
 
-const withLibrary = Effect.fn("SkillLibrary.test.withLibrary")(function* () {
+const withLibrary = Effect.fn("SkillLibrary.test.withLibrary")(function* (
+  options: { readonly scannedProject?: string } = {},
+) {
   const home = yield* Effect.promise(() =>
     NodeFSP.mkdtemp(NodePath.join(NodeOS.tmpdir(), "t3-skills-")),
   );
@@ -43,6 +46,9 @@ const withLibrary = Effect.fn("SkillLibrary.test.withLibrary")(function* () {
     Effect.promise(() => NodeFSP.rm(home, { recursive: true, force: true })),
   );
   const toggled: string[] = [];
+  const scans: string[] = [];
+  const scannedProject =
+    options.scannedProject === undefined ? undefined : NodePath.join(home, options.scannedProject);
   const library = (folder: string, projectFolder: string): ProviderSkillLibrary => ({
     personalRoot: NodePath.join(home, folder, "skills"),
     projectFolder,
@@ -64,15 +70,30 @@ const withLibrary = Effect.fn("SkillLibrary.test.withLibrary")(function* () {
           listInstances: Effect.succeed(instances),
         }),
         Layer.mock(ProviderRegistry)({
+          getProviders: Effect.succeed(
+            scannedProject === undefined
+              ? []
+              : [
+                  {
+                    workspaceSnapshots: [{ cwd: scannedProject }],
+                  } as unknown as ServerProvider,
+                ],
+          ),
           refreshInstance: () => Effect.succeed([]),
-          refreshWorkspaceSnapshot: () => Effect.succeed([]),
+          refreshWorkspaceSnapshot: ({ instanceId, cwd, fresh }) =>
+            Effect.sync(() => {
+              scans.push(
+                `${instanceId}:${NodePath.relative(home, cwd)}:${fresh ? "fresh" : "fill"}`,
+              );
+              return [];
+            }),
         }),
       ),
     ),
     // Off macOS, delete removes rather than using the real Trash.
     Effect.provideService(HostProcessPlatform, "linux"),
   );
-  return { home, skills, toggled };
+  return { home, skills, toggled, scans, scannedProject };
 });
 
 describe("SkillLibrary", () => {
@@ -153,6 +174,35 @@ describe("SkillLibrary", () => {
           ),
         ),
       );
+    }).pipe(Effect.scoped),
+  );
+
+  it.effect("deleting a project skill removes its project link and rescans the project", () =>
+    Effect.gen(function* () {
+      const { home, skills, scans, scannedProject } = yield* withLibrary({
+        scannedProject: "app",
+      });
+      const projectRoot = scannedProject ?? "";
+      const { path } = yield* skills.create({
+        name: "deploy",
+        description: "Deploy",
+        instructions: "",
+        instanceIds: [ProviderInstanceId.make("codex"), ProviderInstanceId.make("claudeAgent")],
+        projectRoot,
+      });
+      assert.strictEqual(path, NodePath.join(home, "app/.agents/skills/deploy/SKILL.md"));
+      scans.length = 0;
+
+      yield* skills.delete({ path });
+      const linkGone = yield* Effect.promise(() =>
+        NodeFSP.lstat(NodePath.join(projectRoot, ".claude/skills/deploy")).then(
+          () => false,
+          () => true,
+        ),
+      );
+      assert.isTrue(linkGone);
+      // One fresh scan, then the other provider refills what it dropped.
+      assert.deepStrictEqual(scans, ["codex:app:fresh", "claudeAgent:app:fill"]);
     }).pipe(Effect.scoped),
   );
 

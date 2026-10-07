@@ -198,14 +198,18 @@ export function SkillsPage({ view }: { view: SkillsView }) {
     if (pending.length === 0) return;
     setScanningProject(view.cwd);
     try {
-      await Promise.all(
-        pending.map((provider) =>
-          refreshProviders({
-            environmentId: view.environmentId,
-            input: { instanceId: provider.instanceId, cwd: view.cwd, ...(fresh ? { fresh } : {}) },
-          }),
-        ),
-      );
+      // A fresh scan drops every other provider's scan of the project, so
+      // only the first is fresh and the rest refill after it, one at a time.
+      for (const [index, provider] of pending.entries()) {
+        await refreshProviders({
+          environmentId: view.environmentId,
+          input: {
+            instanceId: provider.instanceId,
+            cwd: view.cwd,
+            ...(fresh && index === 0 ? { fresh } : {}),
+          },
+        });
+      }
     } finally {
       setScanningProject((current) => (current === view.cwd ? null : current));
     }

@@ -74,6 +74,11 @@ export function renderSkillFile(input: {
   return `---\nname: ${input.name}\ndescription: ${JSON.stringify(input.description)}\n---\n${body ? `\n${body}\n` : ""}`;
 }
 
+function isInside(filePath: string, directory: string): boolean {
+  const relative = NodePath.relative(directory, filePath);
+  return relative.length > 0 && !relative.startsWith("..") && !NodePath.isAbsolute(relative);
+}
+
 /** The link to place at `linkPath`: relative inside a project, absolute otherwise. */
 export function skillLinkTarget(input: {
   readonly linkPath: string;
@@ -109,22 +114,44 @@ export const make = Effect.gen(function* () {
       ? library.personalRoot
       : NodePath.join(projectRoot, library.projectFolder);
 
-  /** Republish every manageable provider's skills, plus the project's when given. */
-  const refreshSkills = (projectRoot: string | undefined) =>
+  /** Project folders with a published skill scan that contain `filePath`. */
+  const scannedProjectsContaining = (filePath: string) =>
+    Effect.map(providers.getProviders, (snapshots) => [
+      ...new Set(
+        snapshots.flatMap((provider) =>
+          (provider.workspaceSnapshots ?? [])
+            .map((snapshot) => snapshot.cwd)
+            .filter((cwd) => isInside(filePath, cwd)),
+        ),
+      ),
+    ]);
+
+  /**
+   * Republish skills after a change at `filePath`: every manageable
+   * provider's own list, then each project whose scan includes that path.
+   * A fresh project scan drops every other provider's scan of that project,
+   * so the first provider scans fresh and the rest refill one at a time.
+   */
+  const refreshSkills = (filePath: string, projectRoot?: string) =>
     Effect.gen(function* () {
       const all = yield* instances.listInstances;
       yield* Effect.forEach(
         all.filter((instance) => instance.skillLibrary !== undefined),
-        (instance) =>
-          projectRoot === undefined
-            ? providers.refreshInstance(instance.instanceId)
-            : providers.refreshWorkspaceSnapshot({
-                instanceId: instance.instanceId,
-                cwd: projectRoot,
-                fresh: true,
-              }),
+        (instance) => providers.refreshInstance(instance.instanceId),
         { concurrency: "unbounded", discard: true },
       );
+      const projects = new Set(yield* scannedProjectsContaining(filePath));
+      if (projectRoot !== undefined) projects.add(projectRoot);
+      const scanners = all.filter((instance) => instance.enabled && instance.snapshotForCwd);
+      for (const cwd of projects) {
+        for (const [index, instance] of scanners.entries()) {
+          yield* providers.refreshWorkspaceSnapshot({
+            instanceId: instance.instanceId,
+            cwd,
+            fresh: index === 0,
+          });
+        }
+      }
     });
 
   const create: SkillLibrary["Service"]["create"] = (input) =>
@@ -164,7 +191,7 @@ export const make = Effect.gen(function* () {
           );
         });
       }
-      yield* refreshSkills(input.projectRoot);
+      yield* refreshSkills(skillPath, input.projectRoot);
       return { path: skillPath };
     });
 
@@ -177,7 +204,7 @@ export const make = Effect.gen(function* () {
       yield* fileOperation(`Could not save ${input.path}.`, () =>
         NodeFSP.writeFile(input.path, input.contents),
       );
-      yield* refreshSkills(undefined);
+      yield* refreshSkills(input.path);
     });
 
   const setEnabled: SkillLibrary["Service"]["setEnabled"] = (input) =>
@@ -186,6 +213,9 @@ export const make = Effect.gen(function* () {
       yield* library
         .setEnabled({ path: input.path, name: input.name, enabled: input.enabled })
         .pipe(Effect.mapError((cause) => new SkillLibraryError({ message: cause.detail, cause })));
+      // The provider republished its own list; project scans carry the flag too.
+      const projects = yield* scannedProjectsContaining(input.path);
+      if (projects.length > 0) yield* refreshSkills(input.path);
     });
 
   const share: SkillLibrary["Service"]["share"] = (input) =>
@@ -215,7 +245,7 @@ export const make = Effect.gen(function* () {
           "dir",
         );
       });
-      yield* refreshSkills(input.projectRoot);
+      yield* refreshSkills(linkPath, input.projectRoot);
     });
 
   const remove: SkillLibrary["Service"]["delete"] = (input) =>
@@ -227,14 +257,25 @@ export const make = Effect.gen(function* () {
       // A link is one provider's view of a skill kept elsewhere: only the link goes.
       if (stats.isSymbolicLink()) {
         yield* fileOperation(`Could not remove ${directory}.`, () => NodeFSP.unlink(directory));
-        yield* refreshSkills(undefined);
+        yield* refreshSkills(input.path);
         return {};
       }
-      // The real folder: remove the personal links other providers had to it
-      // too, so none of them is left pointing at nothing.
+      // The real folder: remove the links other providers had to it too, in
+      // their personal folders and in any scanned project holding it, so none
+      // of them is left pointing at nothing.
       const all = yield* instances.listInstances;
+      const projects = yield* scannedProjectsContaining(input.path);
       const roots = [
-        ...new Set(all.flatMap((instance) => instance.skillLibrary?.personalRoot ?? [])),
+        ...new Set(
+          all.flatMap(({ skillLibrary }) =>
+            skillLibrary
+              ? [
+                  skillLibrary.personalRoot,
+                  ...projects.map((cwd) => NodePath.join(cwd, skillLibrary.projectFolder)),
+                ]
+              : [],
+          ),
+        ),
       ];
       const canonical = yield* fileOperation(`Could not find ${directory}.`, () =>
         NodeFSP.realpath(directory),
@@ -259,7 +300,7 @@ export const make = Effect.gen(function* () {
         yield* fileOperation(`Could not delete ${directory}.`, () =>
           NodeFSP.rm(directory, { recursive: true }),
         );
-        yield* refreshSkills(undefined);
+        yield* refreshSkills(input.path);
         return {};
       }
       let trashedTo = NodePath.join(trash, NodePath.basename(directory));
@@ -269,7 +310,7 @@ export const make = Effect.gen(function* () {
       yield* fileOperation(`Could not move ${directory} to the Trash.`, () =>
         NodeFSP.rename(directory, trashedTo),
       );
-      yield* refreshSkills(undefined);
+      yield* refreshSkills(input.path);
       return { trashedTo };
     });
 
