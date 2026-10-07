@@ -1,4 +1,4 @@
-import { ChartNoAxesColumnIcon, MessagesSquareIcon, SettingsIcon } from "lucide-react";
+import { ChartColumnBigIcon, Icon, MessagesSquareIcon, type IconNode } from "lucide-react";
 import type { ReactNode } from "react";
 import { useLocation, useNavigate, useRouter } from "@tanstack/react-router";
 import { useEffect } from "react";
@@ -21,12 +21,27 @@ const RAIL_ROUTE_IDS = [
   "/settings/general",
 ] as const;
 
+// Lucide's settings gear, with the hub as a second subpath of the same shape so
+// the filled (active) gear keeps its hole under evenodd.
+const settingsGear: IconNode = [
+  [
+    "path",
+    {
+      d: "M9.671 4.136a2.34 2.34 0 0 1 4.659 0 2.34 2.34 0 0 0 3.319 1.915 2.34 2.34 0 0 1 2.33 4.033 2.34 2.34 0 0 0 0 3.831 2.34 2.34 0 0 1-2.33 4.033 2.34 2.34 0 0 0-3.319 1.915 2.34 2.34 0 0 1-4.659 0 2.34 2.34 0 0 0-3.32-1.915 2.34 2.34 0 0 1-2.33-4.033 2.34 2.34 0 0 0 0-3.831A2.34 2.34 0 0 1 6.35 6.051a2.34 2.34 0 0 0 3.319-1.915M15 12a3 3 0 1 1-6 0 3 3 0 1 1 6 0",
+      fillRule: "evenodd",
+      key: "gear",
+    },
+  ],
+];
+
 // Slack-style app rail (my-tweaks trial): one icon per page of the app, left of
 // the thread sidebar. Threads is home; Pull requests, Usage, and Settings are
 // separate pages rather than footer buttons.
+// `activeFill` selects the parts of the icon that fill in on the active page.
 function RailButton(props: {
   label: string;
   active: boolean;
+  activeFill: string;
   onClick: () => void;
   children: ReactNode;
 }) {
@@ -40,8 +55,11 @@ function RailButton(props: {
             aria-current={props.active ? "page" : undefined}
             onClick={props.onClick}
             className={cn(
-              "flex size-10 cursor-pointer items-center justify-center rounded-xl text-sidebar-muted-foreground outline-none hover:bg-row-hover hover:text-sidebar-foreground focus-visible:ring-2 focus-visible:ring-ring [&_svg]:size-[18px]",
-              props.active && "bg-row-active text-sidebar-foreground hover:bg-row-active",
+              "flex size-9 cursor-pointer items-center justify-center rounded-lg text-sidebar-muted-foreground outline-none hover:bg-row-hover hover:text-sidebar-foreground focus-visible:ring-2 focus-visible:ring-ring [&_svg]:size-[18px]",
+              props.active && [
+                "bg-row-active text-sidebar-foreground hover:bg-row-active",
+                props.activeFill,
+              ],
             )}
           />
         }
@@ -84,15 +102,19 @@ export function AppRail() {
         ? "pull-requests"
         : "threads";
   return (
+    // pl-px: the panel's 1px left border blends into the shell, so its visible
+    // edge starts a pixel past the rail. Padding by the same pixel centers the
+    // icons between the window edge and the panel as seen.
     <nav
       aria-label="App"
       data-app-sidebar=""
       data-app-rail=""
-      className="relative z-20 hidden h-[calc(100dvh-var(--app-topbar-height))] w-(--app-rail-width) shrink-0 flex-col items-center gap-1.5 bg-sidebar-shell py-(--app-rail-inset) md:flex [&_button]:[-webkit-app-region:no-drag]"
+      className="relative z-20 hidden h-[calc(100dvh-var(--app-topbar-height))] w-(--app-rail-width) shrink-0 flex-col items-center gap-1.5 bg-sidebar-shell py-(--app-rail-inset) pl-px md:flex [&_button]:[-webkit-app-region:no-drag]"
     >
       <RailButton
         label="Threads"
         active={page === "threads"}
+        activeFill="[&_path:first-child]:fill-current"
         onClick={() => void navigateToMainApp()}
       >
         <MessagesSquareIcon />
@@ -101,6 +123,7 @@ export function AppRail() {
         <RailButton
           label="Pull requests"
           active={page === "pull-requests"}
+          activeFill="[&_circle]:fill-current"
           onClick={() =>
             void navigate({ to: "/pull-requests", search: readPullRequestListPreferences() })
           }
@@ -111,17 +134,19 @@ export function AppRail() {
       <RailButton
         label="Usage"
         active={page === "usage"}
+        activeFill="[&_rect]:fill-current"
         onClick={() => void navigate({ to: "/usage" })}
       >
-        <ChartNoAxesColumnIcon />
+        <ChartColumnBigIcon />
       </RailButton>
       <div className="flex-1" />
       <RailButton
         label="Settings"
         active={page === "settings"}
+        activeFill="[&_path]:fill-current"
         onClick={() => void navigate({ to: "/settings" })}
       >
-        <SettingsIcon />
+        <Icon iconNode={settingsGear} />
       </RailButton>
     </nav>
   );

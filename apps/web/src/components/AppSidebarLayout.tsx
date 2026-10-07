@@ -311,8 +311,8 @@ export function AppSidebarLayout({ children }: { children: ReactNode }) {
     "--app-topbar-height": "2.25rem",
     // After the macOS window buttons (18pt in, 54pt wide) with a 24pt gap.
     "--app-topbar-start": isMacosDesktop && !isWindowFullscreen ? "6rem" : "1rem",
-    "--app-rail-width": "4.5rem",
-    "--app-rail-inset": "1rem",
+    "--app-rail-width": "3.5rem",
+    "--app-rail-inset": "1.125rem",
     "--workspace-controls-top": "var(--app-topbar-height)",
     "--sidebar-width": `${sidebarWidth}px`,
     "--panel-animation-duration": `${panelAnimationDurationMs}ms`,
