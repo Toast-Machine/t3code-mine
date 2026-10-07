@@ -1,3 +1,8 @@
+> **Personal fork.** This checkout is the maintainer's personal build, "T3 Code (Mine)": upstream
+> T3 Code plus a thin layer of design changes, rebased onto each stable release. Read
+> [FORK.md](./FORK.md) before making changes. Its rules (keep upstream updatable, no
+> hacks, never touch `~/.t3/userdata`) take priority where they differ from this file.
+
 # T3 Code
 
 T3 Code is a minimal GUI for coding agents. A Node WebSocket server wraps provider CLIs and agents (Codex, Claude Code, Cursor, Grok, OpenCode, Antigravity) and serves web, desktop, and mobile clients.
