@@ -64,7 +64,18 @@ function persistBundleIcon(iconPath: string): void {
   const script = `ObjC.import("AppKit");
 const image = $.NSImage.alloc.initWithContentsOfFile(${JSON.stringify(iconPath)});
 $.NSWorkspace.sharedWorkspace.setIconForFileOptions(image, ${JSON.stringify(appPath)}, 0);`;
-  NodeChildProcess.execFile("/usr/bin/osascript", ["-l", "JavaScript", "-e", script], (error) => {
-    if (error === null) NodeFS.writeFile(markerPath, iconPath, () => {});
-  });
+  // setIcon reports false rather than throwing when macOS blocks the write
+  // (Privacy & Security > App Management), so only a "true" marks it applied;
+  // anything else retries on the next launch or palette change.
+  NodeChildProcess.execFile(
+    "/usr/bin/osascript",
+    ["-l", "JavaScript", "-e", script],
+    (error, stdout) => {
+      if (error === null && stdout.trim() === "true") {
+        NodeFS.writeFile(markerPath, iconPath, () => {});
+      } else if (lastBundleIcon === iconPath) {
+        lastBundleIcon = null;
+      }
+    },
+  );
 }
