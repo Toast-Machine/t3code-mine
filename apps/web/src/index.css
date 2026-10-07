@@ -2780,12 +2780,18 @@ html[data-palette="deepteal"]:not([data-palette=""]) [data-app-sidebar] {
   --color-yellow-600: var(--color-yellow-300);
 }
 
-/* Split buttons in the header: a short, soft divider instead of a full-height line. */
+/* Split buttons in the header: the 1px gap takes the button tint, with a
+   short, soft divider drawn in its middle. */
 html[data-palette]:not([data-palette=""])
   [data-chat-header]
   [data-slot="group"]
   > [data-slot="separator"] {
-  align-self: center;
-  height: 55%;
-  background-color: color-mix(in oklab, var(--foreground) 14%, transparent);
+  background-color: var(--pal-soft);
+}
+html[data-palette]:not([data-palette=""])
+  [data-chat-header]
+  [data-slot="group"]
+  > [data-slot="separator"]::before {
+  inset: 28% 0;
+  background-color: color-mix(in oklab, var(--foreground) 18%, transparent);
 }
