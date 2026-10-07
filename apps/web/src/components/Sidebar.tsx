@@ -183,7 +183,6 @@ import {
   resolveSidebarThreadStatus,
   searchSidebarThreads,
   shouldCreateNewThreadInCurrentProject,
-  shouldNavigateAfterThreadPark,
   shouldRecedeSidebarThread,
   resolveWorkingStartedAt,
   sidebarListItemId,
@@ -3292,6 +3291,22 @@ export default function Sidebar() {
     },
     [navigateToThread, router],
   );
+  // Personal build: leave a thread you settle or snooze right away, as its row
+  // moves, instead of after the server confirms. Comes back if the server refuses.
+  const parkAndMoveOn = useCallback(
+    async <Result extends AtomCommandResult<unknown, unknown>>(
+      threadRef: ScopedThreadRef,
+      coParkingKeys: ReadonlySet<string> | undefined,
+      park: () => Promise<Result>,
+    ): Promise<Result> => {
+      const navigateForward = planForwardNavigation(scopedThreadKey(threadRef), coParkingKeys);
+      navigateForward?.();
+      const result = await park();
+      if (result._tag === "Failure" && navigateForward !== null) navigateToThread(threadRef);
+      return result;
+    },
+    [navigateToThread, planForwardNavigation],
+  );
 
   const attemptSettle = useCallback(
     (threadRef: ScopedThreadRef, opts: { coSettlingKeys?: ReadonlySet<string> } = {}) => {
@@ -3300,10 +3315,11 @@ export default function Sidebar() {
         if (settlingThreadKeysRef.current.has(threadKey)) return;
         settlingThreadKeysRef.current.add(threadKey);
         try {
-          const navigateAfterSettle = planForwardNavigation(threadKey, opts.coSettlingKeys);
-          const result = await settleThread(threadRef);
+          const result = await parkAndMoveOn(threadRef, opts.coSettlingKeys, () =>
+            settleThread(threadRef),
+          );
           if (result._tag === "Failure") {
-            // Never navigate away from a thread that did not settle.
+            // parkAndMoveOn already brought you back to the thread that did not settle.
             if (!isAtomCommandInterrupted(result)) {
               const error = squashAtomCommandFailure(result);
               toastManager.add(
@@ -3316,25 +3332,12 @@ export default function Sidebar() {
             }
             return;
           }
-          // Only move forward if the user is still on the settled thread —
-          // a navigation made during the await wins over ours.
-          if (
-            shouldNavigateAfterThreadPark({
-              threadKey,
-              currentThreadKey: routeThreadKeyRef.current,
-              action: "settle",
-              now: new Date().toISOString(),
-              thread: readThreadShell(threadRef),
-            })
-          ) {
-            navigateAfterSettle?.();
-          }
         } finally {
           settlingThreadKeysRef.current.delete(threadKey);
         }
       })();
     },
-    [planForwardNavigation, settleThread],
+    [parkAndMoveOn, settleThread],
   );
   const attemptUnsettle = useCallback(
     (threadRef: ScopedThreadRef) => {
@@ -3917,21 +3920,10 @@ export default function Sidebar() {
         switch (plan.kind) {
           case "settle": {
             settlingThreadKeysRef.current.add(activeKey);
-            const navigateAfterSettle = planForwardNavigation(activeKey);
-            const settled = await run(settleThread(threadRef), "Failed to settle thread").finally(
-              () => settlingThreadKeysRef.current.delete(activeKey),
-            );
-            if (
-              settled &&
-              shouldNavigateAfterThreadPark({
-                threadKey: activeKey,
-                currentThreadKey: routeThreadKeyRef.current,
-                action: "settle",
-                now: new Date().toISOString(),
-                thread: readThreadShell(threadRef),
-              })
-            )
-              navigateAfterSettle?.();
+            await run(
+              parkAndMoveOn(threadRef, undefined, () => settleThread(threadRef)),
+              "Failed to settle thread",
+            ).finally(() => settlingThreadKeysRef.current.delete(activeKey));
             return;
           }
           case "move-active":
@@ -3990,7 +3982,7 @@ export default function Sidebar() {
       draggableThreadKeys,
       pinThread,
       pinnedKeys,
-      planForwardNavigation,
+      parkAndMoveOn,
       reorderPinnedThread,
       reorderActiveThread,
       sectionByThreadKey,
@@ -4019,33 +4011,21 @@ export default function Sidebar() {
       try {
         // Snoozing the open thread moves you forward, same as settle —
         // both park the thread you're done with for now.
-        const navigateAfterSnooze = planForwardNavigation(threadKey, opts.coSnoozingKeys);
-        const result = await snoozeThread(threadRef, preset.snoozedUntil);
+        const result = await parkAndMoveOn(threadRef, opts.coSnoozingKeys, () =>
+          snoozeThread(threadRef, preset.snoozedUntil),
+        );
         if (result._tag === "Failure") {
-          // Never navigate away from a thread that did not snooze.
+          // parkAndMoveOn already brought you back to the thread that did not snooze.
           return isAtomCommandInterrupted(result)
             ? ({ status: "interrupted" } as const)
             : ({ status: "failure", error: squashAtomCommandFailure(result) } as const);
-        }
-        // Only move forward if the user is still on the snoozed thread —
-        // a navigation made during the await wins over ours.
-        if (
-          shouldNavigateAfterThreadPark({
-            threadKey,
-            currentThreadKey: routeThreadKeyRef.current,
-            action: "snooze",
-            now: new Date().toISOString(),
-            thread: readThreadShell(threadRef),
-          })
-        ) {
-          navigateAfterSnooze?.();
         }
         return { status: "success" } as const;
       } finally {
         snoozingThreadKeysRef.current.delete(threadKey);
       }
     },
-    [planForwardNavigation, snoozeThread],
+    [parkAndMoveOn, snoozeThread],
   );
   const attemptSnooze = useCallback(
     (
