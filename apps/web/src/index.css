@@ -2276,6 +2276,15 @@ html.dark[data-palette]:not([data-palette=""]) {
   --message-surface: color-mix(in oklab, var(--primary) 11%, var(--background));
 }
 
+/* Sidebar notices (undo, provider updates): one flat, borderless style, sitting as
+   far from the panel's bottom edge as from its sides. */
+[data-app-sidebar] [data-slot="sidebar-footer"] {
+  padding-bottom: var(--sidebar-content-inset);
+}
+[data-app-sidebar] [data-slot="sidebar-footer"] [data-slot="alert"] {
+  border-color: transparent;
+}
+
 /* Header buttons (Add action, Open, Commit & PR...): flat, borderless chips. A button
    wrapped in a popover trigger (the disabled git action with its reason) takes the
    trigger's data-slot, so it is matched separately. */
