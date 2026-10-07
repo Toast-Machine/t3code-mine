@@ -12,7 +12,6 @@ import {
   parseThemeHalves,
   resolveDesktopTheme,
   resolveThemeAppearance,
-  resolveThemeHalf,
   THEME_PREVIEW_ID,
   THEME_APPEARANCE_MODE_STORAGE_KEY,
   THEME_FOLLOW_SYSTEM_STORAGE_KEY,
@@ -344,14 +343,12 @@ function applyTheme(theme: Theme, { suppressTransitions = false, preservePreview
   if (suppressTransitions) {
     document.documentElement.classList.add("no-transitions");
   }
-  const resolvedAppearance = resolveThemeAppearance(
-    theme,
-    systemDark,
-    followSystem,
-    appearanceMode,
-    themeHalves,
-  );
-  applyThemePalette(resolveThemeHalf(theme, themeHalves, resolvedAppearance), resolvedAppearance);
+  // Personal build: the color palettes (palette.ts) replace T3 Code's themes,
+  // so appearance comes only from Light / Dark / System and no stock theme
+  // colors are applied (a light-only theme used to force light at night).
+  const resolvedAppearance =
+    appearanceMode === "dark" || (appearanceMode !== "light" && getSystemDark()) ? "dark" : "light";
+  applyThemePalette("system", resolvedAppearance);
   document.documentElement.classList.toggle("dark", resolvedAppearance === "dark");
   lastAppliedTheme = { theme, systemDark, followSystem, appearanceMode, themeHalves };
   syncBrowserChromeTheme();
