@@ -11,7 +11,6 @@ import { PullRequestGlyph } from "../pullRequest/pullRequestIcons";
 import { readPullRequestListPreferences } from "../pullRequest/pullRequestListPreferences";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 import { useNavigateToMainApp } from "./mainAppLocation";
-import { SidebarPaletteMenuButton } from "./SidebarChrome";
 
 // Route chunks behind the rail: the thread views and each rail page.
 const RAIL_ROUTE_IDS = [
@@ -92,7 +91,7 @@ export function AppRail() {
       aria-label="App"
       data-app-sidebar=""
       data-app-rail=""
-      className="drag-region relative z-20 hidden h-dvh w-(--app-rail-width) shrink-0 flex-col items-center gap-1.5 bg-sidebar-shell ps-2 pt-(--app-rail-top) pb-3 md:flex [&_button]:[-webkit-app-region:no-drag]"
+      className="drag-region relative z-20 hidden h-dvh w-(--app-rail-width) shrink-0 flex-col items-center gap-1.5 bg-sidebar-shell pt-(--app-rail-top) pb-3 md:flex [&_button]:[-webkit-app-region:no-drag]"
     >
       <RailButton
         label="Threads"
@@ -123,7 +122,6 @@ export function AppRail() {
         <ChartNoAxesColumnIcon />
       </RailButton>
       <div className="flex-1" />
-      <SidebarPaletteMenuButton />
       <RailButton
         label="Settings"
         active={page === "settings"}

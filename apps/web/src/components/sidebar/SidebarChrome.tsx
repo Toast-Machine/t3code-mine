@@ -1,4 +1,4 @@
-import { ArrowLeftIcon, ChartNoAxesColumnIcon, PaletteIcon, SettingsIcon } from "lucide-react";
+import { ArrowLeftIcon, ChartNoAxesColumnIcon, SettingsIcon } from "lucide-react";
 import type { ReactNode } from "react";
 import { memo, useCallback } from "react";
 import { useLocation, useNavigate } from "@tanstack/react-router";
@@ -21,8 +21,6 @@ import {
 } from "../ui/sidebar";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 import { readPullRequestListPreferences } from "../pullRequest/pullRequestListPreferences";
-import { Menu, MenuPopup, MenuRadioGroup, MenuRadioItem, MenuTrigger } from "../ui/menu";
-import { PALETTES, setPalette, usePalette, type PaletteId } from "../../palette";
 import { isSidebarUtilityPage, useNavigateToMainApp } from "./mainAppLocation";
 import { SidebarThreadUndoNotice } from "./SidebarThreadUndoNotice";
 import { SidebarProviderUpdatePill } from "./SidebarProviderUpdatePill";
@@ -101,78 +99,6 @@ function SidebarUtilityItem({
   );
 }
 
-export function SidebarPaletteMenuButton() {
-  const palette = usePalette();
-  return (
-    <Menu>
-      <MenuTrigger
-        render={
-          <button
-            type="button"
-            aria-label="Color palette"
-            className="flex size-10 cursor-pointer items-center justify-center rounded-xl text-sidebar-muted-foreground outline-none hover:bg-row-hover hover:text-sidebar-foreground focus-visible:ring-2 focus-visible:ring-ring [&_svg]:size-[18px]"
-          />
-        }
-      >
-        <PaletteIcon />
-      </MenuTrigger>
-      <MenuPopup side="right" align="end">
-        <MenuRadioGroup value={palette} onValueChange={(value) => setPalette(value as PaletteId)}>
-          {PALETTES.map((option) => (
-            <MenuRadioItem key={option.id} value={option.id} closeOnClick>
-              <span className="flex items-center gap-2">
-                <span aria-hidden className="flex">
-                  {option.swatch.map((color) => (
-                    <span
-                      key={color}
-                      className="-mr-1 size-3.5 rounded-full ring-1 ring-black/10"
-                      style={{ backgroundColor: color }}
-                    />
-                  ))}
-                </span>
-                <span className="ml-1">{option.label}</span>
-              </span>
-            </MenuRadioItem>
-          ))}
-        </MenuRadioGroup>
-      </MenuPopup>
-    </Menu>
-  );
-}
-
-function SidebarPaletteMenu() {
-  const palette = usePalette();
-  return (
-    <SidebarMenuItem className="shrink-0">
-      <Menu>
-        <MenuTrigger render={<SidebarMenuButton aria-label="Color palette" size="icon" />}>
-          <PaletteIcon />
-        </MenuTrigger>
-        <MenuPopup side="top" align="start">
-          <MenuRadioGroup value={palette} onValueChange={(value) => setPalette(value as PaletteId)}>
-            {PALETTES.map((option) => (
-              <MenuRadioItem key={option.id} value={option.id} closeOnClick>
-                <span className="flex items-center gap-2">
-                  <span aria-hidden className="flex">
-                    {option.swatch.map((color) => (
-                      <span
-                        key={color}
-                        className="-mr-1 size-3.5 rounded-full ring-1 ring-black/10"
-                        style={{ backgroundColor: color }}
-                      />
-                    ))}
-                  </span>
-                  <span className="ml-1">{option.label}</span>
-                </span>
-              </MenuRadioItem>
-            ))}
-          </MenuRadioGroup>
-        </MenuPopup>
-      </Menu>
-    </SidebarMenuItem>
-  );
-}
-
 export const SidebarUtilityMenu = memo(function SidebarUtilityMenu() {
   const navigate = useNavigate();
   const navigateToMainApp = useNavigateToMainApp();
@@ -231,7 +157,6 @@ export const SidebarUtilityMenu = memo(function SidebarUtilityMenu() {
             label="Settings"
             onClick={handleSettingsClick}
           />
-          <SidebarPaletteMenu />
           {pullRequestsSupported ? (
             <SidebarUtilityItem
               icon={<PullRequestGlyph.pullRequest />}

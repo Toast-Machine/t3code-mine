@@ -577,9 +577,8 @@ const activeSurfaceClassName = "bg-row-active";
 const selectedSurfaceClassName = "bg-row-selected";
 // Pinned tiles are the one filled element at rest, like Arc's favorites.
 const tileRestSurfaceClassName = "bg-chip hover:bg-chip/70";
-// Unsent work shares one look: the new-thread draft rows and thread rows
-// with unsent composer text both use this tint and pen so they read alike.
-const draftSurfaceClassName = "bg-warning/8 hover:bg-warning/12";
+// Unsent work (draft rows and threads with unsent text) is marked by this pen
+// alone; a row tint read like a selection.
 const draftPenClassName = "size-3 shrink-0 text-warning-foreground";
 
 // Structural list items — the section headers and the
@@ -851,7 +850,7 @@ const SidebarDraftRow = memo(function SidebarDraftRow(props: {
         data-testid="sidebar-draft-row"
         className={cn(
           "group/sidebar-row relative w-full cursor-pointer overflow-hidden rounded-xl text-left text-sidebar-foreground outline-none select-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring",
-          props.isActive ? activeSurfaceClassName : draftSurfaceClassName,
+          props.isActive ? activeSurfaceClassName : restSurfaceClassName,
         )}
         onClick={handleActivate}
         onKeyDown={handleKeyDown}
@@ -1509,9 +1508,7 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: {
       ? activeSurfaceClassName
       : isSelected
         ? selectedSurfaceClassName
-        : hasUnsentDraft
-          ? draftSurfaceClassName
-          : restSurfaceClassName,
+        : restSurfaceClassName,
     // Background work fades as a whole row, status label included, so it
     // takes less attention than rows that need a human (input, approval).
     shouldRecede &&
@@ -1725,10 +1722,7 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: {
                   "flex h-14 flex-col items-center justify-center gap-1 px-2",
                   props.isActive
                     ? "ring-2 ring-sidebar-foreground/25 ring-inset"
-                    : !isSelected &&
-                        !hasUnsentDraft &&
-                        !needsAttentionFill &&
-                        tileRestSurfaceClassName,
+                    : !isSelected && tileRestSurfaceClassName,
                 )}
                 onClick={handleClick}
                 onDoubleClick={handleDoubleClick}

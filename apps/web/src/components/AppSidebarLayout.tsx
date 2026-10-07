@@ -302,10 +302,11 @@ export function AppSidebarLayout({ children }: { children: ReactNode }) {
       : false;
   });
   const sidebarProviderStyle = {
-    // Wide enough on macOS to hold the window buttons above the rail icons.
-    "--app-rail-width": isMacosDesktop && !isWindowFullscreen ? "5.5rem" : "4rem",
-    // First rail icon: centered on the panel's title row, or on macOS (where the
-    // window buttons own that row) aligned with the search row below it.
+    // The rail owns the whole left gutter up to the panel, so its icons center
+    // by layout alone. Wider on macOS to hold the window buttons above them.
+    "--app-rail-width": isMacosDesktop && !isWindowFullscreen ? "6rem" : "4.5rem",
+    // First rail icon: centered on the page sidebar's title row, or on macOS
+    // (where the window buttons own that row) aligned with the search row.
     "--app-rail-top":
       isMacosDesktop && !isWindowFullscreen
         ? "calc(var(--workspace-topbar-height) + 1rem)"
@@ -313,7 +314,7 @@ export function AppSidebarLayout({ children }: { children: ReactNode }) {
     "--sidebar-width": `${sidebarWidth}px`,
     "--panel-animation-duration": `${panelAnimationDurationMs}ms`,
     // Panel titlebar controls start just inside the panel, right of the rail.
-    "--workspace-controls-left": "calc(var(--app-rail-width) + 0.75rem)",
+    "--workspace-controls-left": "calc(var(--app-rail-width) + 0.25rem)",
     // Collapsed-list title inset is padding inside the panel, so it is measured
     // from the panel edge (the reopen button sits 0.75rem in), not the window.
     "--workspace-titlebar-content-left":
