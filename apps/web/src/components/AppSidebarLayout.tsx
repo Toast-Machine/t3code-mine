@@ -34,6 +34,7 @@ import {
 import LegacyThreadSidebar from "./LegacySidebar";
 import ThreadSidebar from "./Sidebar";
 import { SettingsSidebarNav } from "./settings/SettingsSidebarNav";
+import { AppRail } from "./sidebar/AppRail";
 import { SidebarChromeHeader } from "./sidebar/SidebarChrome";
 import { MainAppLocationTracker } from "./sidebar/mainAppLocation";
 import { useSidebarStageBackdropVariant } from "./SidebarStageBackdrop";
@@ -250,6 +251,7 @@ export function AppSidebarLayout({ children }: { children: ReactNode }) {
       : false;
   });
   const sidebarProviderStyle = {
+    "--app-rail-width": "4rem",
     "--sidebar-width": `${sidebarWidth}px`,
     "--panel-animation-duration": `${panelAnimationDurationMs}ms`,
     ...(isMacosDesktop && !isWindowFullscreen
@@ -303,6 +305,7 @@ export function AppSidebarLayout({ children }: { children: ReactNode }) {
         style={sidebarProviderStyle}
       >
         <ProjectProjectionRetention />
+        <AppRail />
         <Sidebar
           side="left"
           variant="inset"
@@ -310,6 +313,13 @@ export function AppSidebarLayout({ children }: { children: ReactNode }) {
           data-app-sidebar=""
           role="navigation"
           aria-label={isOnSettings ? "Settings" : "Threads"}
+          // The rail sits left of the sidebar, so header controls that clear
+          // the macOS window buttons need that much less inset here.
+          className={
+            isMacosDesktop && !isWindowFullscreen
+              ? "[--workspace-controls-left:max(0.75rem,calc(var(--desktop-window-controls-inset,90px)-var(--app-rail-width)))]"
+              : undefined
+          }
           resizable={{
             maxWidth: sidebarMaximumWidth,
             minWidth: THREAD_SIDEBAR_MIN_WIDTH,
