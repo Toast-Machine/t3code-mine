@@ -2719,10 +2719,58 @@ html[data-palette="deepteal"]:not([data-palette=""])
   --info-foreground: #a9dbe0;
 }
 
-/* Hover and highlight wash on the light (or dark) content panel: a touch
-   stronger than the stock accent so hovered controls read on white. Deep
-   palettes still override it inside the sidebar. */
+/* Content panel surfaces follow the palette: hover washes, message bubbles,
+   and header buttons are a soft tint of the palette's accent instead of the
+   stock gray/blue, so the whole app reads as one theme. Deep palettes still
+   override hover inside the sidebar. */
 html[data-palette]:not([data-palette=""]) {
-  --accent: color-mix(in oklab, var(--foreground) 8%, var(--background));
-  --toolbar-control-hover: color-mix(in oklab, var(--foreground) 8%, var(--background));
+  --pal-soft: color-mix(in oklab, var(--primary) 8%, var(--background));
+  --pal-soft-hover: color-mix(in oklab, var(--primary) 14%, var(--background));
+  --accent: var(--pal-soft-hover);
+  --toolbar-control-hover: var(--pal-soft-hover);
+  --message-surface: color-mix(in oklab, var(--primary) 11%, var(--background));
+}
+
+/* Header buttons (Add action, Open, Commit & PR...): flat, borderless chips. */
+html[data-palette]:not([data-palette=""]) [data-chat-header] [data-slot="button"],
+html[data-palette]:not([data-palette=""]) [data-chat-header] [data-slot="menu-trigger"],
+html[data-palette]:not([data-palette=""]) [data-chat-header] [data-toolbar-control] {
+  background-color: var(--pal-soft);
+  border-color: transparent;
+  box-shadow: none;
+}
+html[data-palette]:not([data-palette=""]) [data-chat-header] [data-slot="button"]:hover,
+html[data-palette]:not([data-palette=""]) [data-chat-header] [data-slot="menu-trigger"]:hover,
+html[data-palette]:not([data-palette=""]) [data-chat-header] [data-toolbar-control]:hover {
+  background-color: var(--pal-soft-hover);
+}
+html[data-palette]:not([data-palette=""]) [data-chat-header] [data-slot="button"]::before,
+html[data-palette]:not([data-palette=""]) [data-chat-header] [data-toolbar-control]::before {
+  box-shadow: none;
+}
+
+/* Deep palettes: project icon colors use their light shades on the dark sidebar. */
+html[data-palette="blueberry"]:not([data-palette=""]) [data-app-sidebar],
+html[data-palette="forest"]:not([data-palette=""]) [data-app-sidebar],
+html[data-palette="rosewood"]:not([data-palette=""]) [data-app-sidebar],
+html[data-palette="plum"]:not([data-palette=""]) [data-app-sidebar],
+html[data-palette="deepteal"]:not([data-palette=""]) [data-app-sidebar] {
+  --color-amber-600: var(--color-amber-300);
+  --color-blue-600: var(--color-blue-300);
+  --color-cyan-600: var(--color-cyan-300);
+  --color-emerald-600: var(--color-emerald-300);
+  --color-fuchsia-600: var(--color-fuchsia-300);
+  --color-gray-600: var(--color-gray-300);
+  --color-green-600: var(--color-green-300);
+  --color-indigo-600: var(--color-indigo-300);
+  --color-lime-600: var(--color-lime-300);
+  --color-orange-600: var(--color-orange-300);
+  --color-pink-600: var(--color-pink-300);
+  --color-purple-600: var(--color-purple-300);
+  --color-red-600: var(--color-red-300);
+  --color-rose-600: var(--color-rose-300);
+  --color-sky-600: var(--color-sky-300);
+  --color-teal-600: var(--color-teal-300);
+  --color-violet-600: var(--color-violet-300);
+  --color-yellow-600: var(--color-yellow-300);
 }

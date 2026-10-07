@@ -53,7 +53,8 @@ import {
   CircleCheckIcon,
   CircleDashedIcon,
   ClockIcon,
-  EyeIcon,
+  MailIcon,
+  MailOpenIcon,
   FolderIcon,
   GitBranchIcon,
   MessageCircleQuestionIcon,
@@ -1191,6 +1192,18 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: {
   // Same semantics as the legacy sidebar (never-visited counts as read):
   // switching sidebars must not light up every historical thread as unread.
   const isUnread = hasUnseenCompletion({ ...thread, lastVisitedAt });
+  const markThreadUnread = useUiStateStore((state) => state.markThreadUnread);
+  const markThreadVisited = useUiStateStore((state) => state.markThreadVisited);
+  const canToggleRead = thread.latestTurn?.completedAt != null;
+  const handleToggleReadClick = useCallback(
+    (event: ReactMouseEvent) => {
+      event.preventDefault();
+      event.stopPropagation();
+      if (isUnread) markThreadVisited(threadKey, new Date().toISOString());
+      else markThreadUnread(threadKey, thread.latestTurn?.completedAt);
+    },
+    [isUnread, markThreadUnread, markThreadVisited, threadKey, thread.latestTurn?.completedAt],
+  );
   const status = resolveSidebarThreadStatus(thread);
   // A woken thread reappears at its original position (the sort is
   // deliberately static), so the pill has to carry the weight. Snoozing is
@@ -2003,7 +2016,10 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: {
                       threadTimeLabel(thread)
                     )}
                   </span>
-                  {props.settlementSupported || showSnoozeButton || hasUnsentDraft ? (
+                  {props.settlementSupported ||
+                  showSnoozeButton ||
+                  hasUnsentDraft ||
+                  canToggleRead ? (
                     <span
                       className={cn(
                         // focus-visible, not focus-within: a mouse click leaves
@@ -2030,6 +2046,29 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: {
                             <XIcon className="size-3.5" />
                           </TooltipTrigger>
                           <TooltipPopup side="top">Discard draft</TooltipPopup>
+                        </Tooltip>
+                      ) : null}
+                      {canToggleRead ? (
+                        <Tooltip>
+                          <TooltipTrigger
+                            render={
+                              <button
+                                type="button"
+                                aria-label={isUnread ? "Mark as read" : "Mark as unread"}
+                                onClick={handleToggleReadClick}
+                                className="inline-flex cursor-pointer items-center rounded-md bg-transparent px-1.5 text-xs text-muted-foreground hover:text-foreground"
+                              />
+                            }
+                          >
+                            {isUnread ? (
+                              <MailOpenIcon className="size-3.5" />
+                            ) : (
+                              <MailIcon className="size-3.5" />
+                            )}
+                          </TooltipTrigger>
+                          <TooltipPopup side="top">
+                            {isUnread ? "Mark as read" : "Mark as unread"}
+                          </TooltipPopup>
                         </Tooltip>
                       ) : null}
                       {showSnoozeButton ? (
