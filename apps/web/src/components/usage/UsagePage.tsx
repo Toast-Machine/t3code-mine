@@ -461,7 +461,7 @@ export function UsagePage({
   return (
     <SidebarInset className="h-dvh min-h-0 overflow-hidden overscroll-y-none isolate">
       <div className="flex min-h-0 min-w-0 flex-1 flex-col bg-background text-foreground">
-        {/* Right edge on the titlebar-controls inset, so refresh lines up with the
+        {/* Personal build: right edge on the titlebar-controls inset, so refresh lines up with the
             panel toggle on the thread and pull request pages. */}
         <WorkspacePageHeader
           electron={isElectron}
