@@ -118,6 +118,12 @@ export const RPC_REQUIRED_SCOPES = {
   [WS_METHODS.projectsEnsureScratch]: AuthOrchestrationOperateScope,
   [WS_METHODS.projectsCreateNew]: AuthOrchestrationOperateScope,
   [WS_METHODS.shellOpenInEditor]: AuthOrchestrationOperateScope,
+  // Personal build: managing skills from the Skills page.
+  [WS_METHODS.skillsCreate]: AuthOrchestrationOperateScope,
+  [WS_METHODS.skillsSave]: AuthOrchestrationOperateScope,
+  [WS_METHODS.skillsSetEnabled]: AuthOrchestrationOperateScope,
+  [WS_METHODS.skillsShare]: AuthOrchestrationOperateScope,
+  [WS_METHODS.skillsDelete]: AuthOrchestrationOperateScope,
   [WS_METHODS.filesystemBrowse]: AuthOrchestrationReadScope,
   [WS_METHODS.agentSessionsScan]: AuthOrchestrationReadScope,
   [WS_METHODS.agentSessionsImport]: AuthOrchestrationOperateScope,

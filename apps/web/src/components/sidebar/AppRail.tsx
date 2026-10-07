@@ -8,6 +8,7 @@ import { useEnvironments } from "../../state/environments";
 import { PullRequestGlyph } from "../pullRequest/pullRequestIcons";
 import { readPullRequestListPreferences } from "../pullRequest/pullRequestListPreferences";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
+import { SkillsIcon } from "../skills/SkillsIcon";
 import { useNavigateToMainApp } from "./mainAppLocation";
 
 // Route chunks behind the rail: the thread views and each rail page.
@@ -17,6 +18,7 @@ const RAIL_ROUTE_IDS = [
   "/_chat/draft/$draftId",
   "/_chat/pull-requests",
   "/usage",
+  "/skills",
   "/settings",
   "/settings/general",
 ] as const;
@@ -96,11 +98,13 @@ export function AppRail() {
   );
   const page = pathname.startsWith("/settings")
     ? "settings"
-    : pathname.startsWith("/usage")
-      ? "usage"
-      : pathname.startsWith("/pull-requests")
-        ? "pull-requests"
-        : "threads";
+    : pathname.startsWith("/skills")
+      ? "skills"
+      : pathname.startsWith("/usage")
+        ? "usage"
+        : pathname.startsWith("/pull-requests")
+          ? "pull-requests"
+          : "threads";
   return (
     // pl-px: the panel's 1px left border blends into the shell, so its visible
     // edge starts a pixel past the rail. Padding by the same pixel centers the
@@ -138,6 +142,14 @@ export function AppRail() {
         onClick={() => void navigate({ to: "/usage" })}
       >
         <ChartColumnBigIcon />
+      </RailButton>
+      <RailButton
+        label="Skills"
+        active={page === "skills"}
+        activeFill="[&_[data-fill]]:fill-current [&_[data-text]]:opacity-0"
+        onClick={() => void navigate({ to: "/skills" })}
+      >
+        <SkillsIcon />
       </RailButton>
       <div className="flex-1" />
       <RailButton

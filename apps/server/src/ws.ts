@@ -93,6 +93,8 @@ import * as ServerConfig from "./config.ts";
 import * as EnvironmentTheme from "./environmentTheme.ts";
 import * as Keybindings from "./keybindings.ts";
 import * as ExternalLauncher from "./process/externalLauncher.ts";
+// Personal build: the Skills page.
+import * as SkillLibrary from "./skills/SkillLibrary.ts";
 import {
   projectActivityEvent,
   projectThreadDetailSnapshot,
@@ -556,6 +558,7 @@ const makeWsRpcLayer = (
       const environmentTheme = yield* EnvironmentTheme.EnvironmentThemeService;
       const usageLimitSources = yield* UsageLimitSources.UsageLimitSources;
       const externalLauncher = yield* ExternalLauncher.ExternalLauncher;
+      const skillLibrary = yield* SkillLibrary.SkillLibrary;
       const remoteOpenTargets = yield* RemoteOpenTargets.RemoteOpenTargets;
       const gitWorkflow = yield* GitWorkflowService.GitWorkflowService;
       const review = yield* ReviewService.ReviewService;
@@ -3416,6 +3419,27 @@ const makeWsRpcLayer = (
           ),
         [WS_METHODS.shellOpenInEditor]: (input) =>
           observeRpcEffect(WS_METHODS.shellOpenInEditor, externalLauncher.launchEditor(input), {
+            "rpc.aggregate": "workspace",
+          }),
+        // Personal build: managing skills from the Skills page.
+        [WS_METHODS.skillsCreate]: (input) =>
+          observeRpcEffect(WS_METHODS.skillsCreate, skillLibrary.create(input), {
+            "rpc.aggregate": "workspace",
+          }),
+        [WS_METHODS.skillsSave]: (input) =>
+          observeRpcEffect(WS_METHODS.skillsSave, skillLibrary.save(input), {
+            "rpc.aggregate": "workspace",
+          }),
+        [WS_METHODS.skillsSetEnabled]: (input) =>
+          observeRpcEffect(WS_METHODS.skillsSetEnabled, skillLibrary.setEnabled(input), {
+            "rpc.aggregate": "workspace",
+          }),
+        [WS_METHODS.skillsShare]: (input) =>
+          observeRpcEffect(WS_METHODS.skillsShare, skillLibrary.share(input), {
+            "rpc.aggregate": "workspace",
+          }),
+        [WS_METHODS.skillsDelete]: (input) =>
+          observeRpcEffect(WS_METHODS.skillsDelete, skillLibrary.delete(input), {
             "rpc.aggregate": "workspace",
           }),
         [WS_METHODS.filesystemBrowse]: (input) =>

@@ -69,6 +69,7 @@ import {
   resolveCodexHomeLayout,
 } from "./CodexHomeLayout.ts";
 import { makeManagedCodexProvider } from "./CodexManagedProvider.ts";
+import { makeCodexSkillLibrary } from "./CodexSkillLibrary.ts";
 import { CodexInstallation } from "../CodexInstallation.ts";
 import { ServerSecretStore } from "../../auth/ServerSecretStore.ts";
 import { ServerEnvironmentIdentity } from "../../environment/ServerEnvironment.ts";
@@ -362,6 +363,29 @@ export const CodexDriver: ProviderDriver<CodexSettings, CodexDriverEnv> = {
         consumeResetCredit,
         adapter,
         textGeneration,
+        // Personal build: skills managed from the Skills page.
+        skillLibrary: makeCodexSkillLibrary({
+          homePath: homeLayout.sharedHomePath,
+          driver: DRIVER_KIND,
+          instanceId,
+          path: pathService,
+          writeSkillConfig: (params) =>
+            Effect.gen(function* () {
+              const { client } = yield* withCodexAppServerClient({
+                binaryPath: effectiveConfig.binaryPath,
+                homePath: effectiveConfig.homePath,
+                launchArgs: resolveCodexLaunchArgs(effectiveConfig.launchArgs, processEnv),
+                cwd: process.cwd(),
+                environment: processEnv,
+              });
+              return yield* client.request("skills/config/write", params);
+            }).pipe(
+              Effect.scoped,
+              Effect.timeout("20 seconds"),
+              Effect.provideService(ChildProcessSpawner.ChildProcessSpawner, spawner),
+            ),
+          refresh: snapshot.refresh,
+        }),
       } satisfies ProviderInstance;
     }),
 };

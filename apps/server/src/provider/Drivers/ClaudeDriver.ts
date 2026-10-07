@@ -67,6 +67,7 @@ import {
   resolveClaudeHomePath,
 } from "./ClaudeHome.ts";
 import { discoverClaudeSkills } from "./ClaudeSkills.ts";
+import { makeClaudeSkillLibrary } from "./ClaudeSkillLibrary.ts";
 const decodeClaudeSettings = Schema.decodeSync(ClaudeSettings);
 
 const DRIVER_KIND = ProviderDriverKind.make("claudeAgent");
@@ -348,6 +349,15 @@ export const ClaudeDriver: ProviderDriver<ClaudeSettings, ClaudeDriverEnv> = {
         adapter,
         textGeneration,
         consumeResetCredit,
+        // Personal build: skills managed from the Skills page.
+        skillLibrary: makeClaudeSkillLibrary({
+          configDir,
+          driver: DRIVER_KIND,
+          instanceId,
+          fileSystem,
+          path,
+          refresh: snapshot.refresh,
+        }),
       } satisfies ProviderInstance;
     }),
 };

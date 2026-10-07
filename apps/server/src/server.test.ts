@@ -121,6 +121,7 @@ import * as EnvironmentTheme from "./environmentTheme.ts";
 import * as UsageLimitSources from "./usage/UsageLimitSources.ts";
 import * as Keybindings from "./keybindings.ts";
 import * as ExternalLauncher from "./process/externalLauncher.ts";
+import * as SkillLibrary from "./skills/SkillLibrary.ts";
 import * as RemoteOpenTargets from "./environment/RemoteOpenTargets.ts";
 import * as OrchestrationEngine from "./orchestration/Services/OrchestrationEngine.ts";
 import {
@@ -875,6 +876,8 @@ const buildAppUnderTest = (options?: {
           Layer.mock(RemoteOpenTargets.RemoteOpenTargets)({
             resolveTargets: () => Effect.succeed([]),
           }),
+          // Personal build: the Skills page's service, unused by these tests.
+          Layer.mock(SkillLibrary.SkillLibrary)({}),
         ),
       ),
       Layer.provide(

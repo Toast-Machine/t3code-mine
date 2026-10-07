@@ -1,4 +1,4 @@
-import type { ComponentType } from "react";
+import { isValidElement, type ComponentType, type ReactElement } from "react";
 
 import {
   SidebarContent,
@@ -11,7 +11,8 @@ import {
 export interface PageSidebarItem {
   readonly id: string;
   readonly label: string;
-  readonly icon: ComponentType;
+  /** An icon component, or a rendered icon such as a project favicon. */
+  readonly icon: ComponentType | ReactElement;
   readonly active: boolean;
   readonly onSelect: () => void;
 }
@@ -39,7 +40,7 @@ export function PageSidebarNav({ sections }: { sections: ReadonlyArray<PageSideb
               return (
                 <SidebarMenuItem key={item.id}>
                   <SidebarMenuButton isActive={item.active} onClick={item.onSelect}>
-                    <Icon />
+                    {isValidElement(Icon) ? Icon : <Icon />}
                     <span className="truncate">{item.label}</span>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
