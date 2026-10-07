@@ -2517,7 +2517,9 @@ html[data-palette="blueberry"]:not([data-palette=""]) {
 }
 html[data-palette="blueberry"]:not([data-palette=""]) [data-slot="sidebar"],
 html[data-palette="blueberry"]:not([data-palette=""]) [data-app-sidebar],
-html[data-palette="blueberry"]:not([data-palette=""]) [data-sidebar-control] {
+html[data-palette="blueberry"]:not([data-palette=""])
+  [data-sidebar-state="expanded"]
+  [data-sidebar-control] {
   --contrast-sidebar-foreground: #ffffff;
   --contrast-foreground: #ffffff;
   --contrast-muted-foreground: rgb(255 255 255 / 0.62);
@@ -2558,7 +2560,9 @@ html[data-palette="forest"]:not([data-palette=""]) {
 }
 html[data-palette="forest"]:not([data-palette=""]) [data-slot="sidebar"],
 html[data-palette="forest"]:not([data-palette=""]) [data-app-sidebar],
-html[data-palette="forest"]:not([data-palette=""]) [data-sidebar-control] {
+html[data-palette="forest"]:not([data-palette=""])
+  [data-sidebar-state="expanded"]
+  [data-sidebar-control] {
   --contrast-sidebar-foreground: #ffffff;
   --contrast-foreground: #ffffff;
   --contrast-muted-foreground: rgb(255 255 255 / 0.62);
@@ -2599,7 +2603,9 @@ html[data-palette="rosewood"]:not([data-palette=""]) {
 }
 html[data-palette="rosewood"]:not([data-palette=""]) [data-slot="sidebar"],
 html[data-palette="rosewood"]:not([data-palette=""]) [data-app-sidebar],
-html[data-palette="rosewood"]:not([data-palette=""]) [data-sidebar-control] {
+html[data-palette="rosewood"]:not([data-palette=""])
+  [data-sidebar-state="expanded"]
+  [data-sidebar-control] {
   --contrast-sidebar-foreground: #ffffff;
   --contrast-foreground: #ffffff;
   --contrast-muted-foreground: rgb(255 255 255 / 0.62);
@@ -2640,7 +2646,9 @@ html[data-palette="plum"]:not([data-palette=""]) {
 }
 html[data-palette="plum"]:not([data-palette=""]) [data-slot="sidebar"],
 html[data-palette="plum"]:not([data-palette=""]) [data-app-sidebar],
-html[data-palette="plum"]:not([data-palette=""]) [data-sidebar-control] {
+html[data-palette="plum"]:not([data-palette=""])
+  [data-sidebar-state="expanded"]
+  [data-sidebar-control] {
   --contrast-sidebar-foreground: #ffffff;
   --contrast-foreground: #ffffff;
   --contrast-muted-foreground: rgb(255 255 255 / 0.62);
@@ -2681,7 +2689,9 @@ html[data-palette="deepteal"]:not([data-palette=""]) {
 }
 html[data-palette="deepteal"]:not([data-palette=""]) [data-slot="sidebar"],
 html[data-palette="deepteal"]:not([data-palette=""]) [data-app-sidebar],
-html[data-palette="deepteal"]:not([data-palette=""]) [data-sidebar-control] {
+html[data-palette="deepteal"]:not([data-palette=""])
+  [data-sidebar-state="expanded"]
+  [data-sidebar-control] {
   --contrast-sidebar-foreground: #ffffff;
   --contrast-foreground: #ffffff;
   --contrast-muted-foreground: rgb(255 255 255 / 0.62);
