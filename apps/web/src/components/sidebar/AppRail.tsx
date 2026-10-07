@@ -9,6 +9,7 @@ import { PullRequestGlyph } from "../pullRequest/pullRequestIcons";
 import { readPullRequestListPreferences } from "../pullRequest/pullRequestListPreferences";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 import { SkillsIcon } from "../skills/SkillsIcon";
+import { ForkUpdateRailButton } from "./ForkUpdateRailButton";
 import { useNavigateToMainApp } from "./mainAppLocation";
 
 // Route chunks behind the rail: the thread views and each rail page.
@@ -152,6 +153,7 @@ export function AppRail() {
         <SkillsIcon />
       </RailButton>
       <div className="flex-1" />
+      <ForkUpdateRailButton />
       <RailButton
         label="Settings"
         active={page === "settings"}
