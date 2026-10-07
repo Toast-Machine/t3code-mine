@@ -35,6 +35,8 @@ import LegacyThreadSidebar from "./LegacySidebar";
 import ThreadSidebar from "./Sidebar";
 import { SettingsSidebarNav } from "./settings/SettingsSidebarNav";
 import { AppRail } from "./sidebar/AppRail";
+import { PullRequestsSidebarNav } from "./pullRequest/PullRequestsSidebarNav";
+import { UsageSidebarNav } from "./usage/UsageSidebarNav";
 import { SidebarChromeHeader } from "./sidebar/SidebarChrome";
 import { MainAppLocationTracker } from "./sidebar/mainAppLocation";
 import { useSidebarStageBackdropVariant } from "./SidebarStageBackdrop";
@@ -221,6 +223,52 @@ function ProjectProjectionRetention() {
   return null;
 }
 
+// Each page of the app shows its own sidebar next to the rail, or none. A page
+// without one renders like a collapsed sidebar. New pages default to the
+// thread list until they are given a sidebar of their own here.
+function resolvePageSidebar(
+  pathname: string,
+  legacySidebarEnabled: boolean,
+): { label: string; content: ReactNode } | null {
+  if (pathname === "/settings" || pathname.startsWith("/settings/")) {
+    return {
+      label: "Settings",
+      content: (
+        <>
+          <SidebarChromeHeader isElectron={isElectron} title="Settings" />
+          <SettingsSidebarNav pathname={pathname} />
+        </>
+      ),
+    };
+  }
+  if (pathname.startsWith("/usage")) {
+    return {
+      label: "Usage",
+      content: (
+        <>
+          <SidebarChromeHeader isElectron={isElectron} title="Usage" />
+          <UsageSidebarNav />
+        </>
+      ),
+    };
+  }
+  if (pathname.startsWith("/pull-requests")) {
+    return {
+      label: "Pull requests",
+      content: (
+        <>
+          <SidebarChromeHeader isElectron={isElectron} title="Pull requests" />
+          <PullRequestsSidebarNav />
+        </>
+      ),
+    };
+  }
+  return {
+    label: "Threads",
+    content: legacySidebarEnabled ? <LegacyThreadSidebar /> : <ThreadSidebar />,
+  };
+}
+
 export function AppSidebarLayout({ children }: { children: ReactNode }) {
   const navigate = useNavigate();
   const legacySidebarEnabled = useLegacySidebarEnabled();
@@ -231,10 +279,7 @@ export function AppSidebarLayout({ children }: { children: ReactNode }) {
   const pathname = useLocation({ select: (location) => location.pathname });
   const panelAnimationsSuppressed = usePanelNavigationSuppression(pathname);
   const routePanelAnimationsActive = panelAnimationsActive && !panelAnimationsSuppressed;
-  const isOnSettings = pathname === "/settings" || pathname.startsWith("/settings/");
-  // The thread list belongs to the chat area; full pages opened from the rail
-  // (Pull requests, Usage) take the whole width instead.
-  const hidesThreadList = pathname.startsWith("/usage") || pathname.startsWith("/pull-requests");
+  const pageSidebar = resolvePageSidebar(pathname, legacySidebarEnabled);
   const isMacosDesktop = isElectron && isMacPlatform(navigator.platform);
   const [sidebarWidth, setSidebarWidth] = useState(readInitialThreadSidebarWidth);
   // Subscribed rather than read once: the clamp must track live window size,
@@ -265,7 +310,7 @@ export function AppSidebarLayout({ children }: { children: ReactNode }) {
       isMacosDesktop && !isWindowFullscreen
         ? "calc(var(--workspace-topbar-height) + 1rem)"
         : "calc(0.5rem + (var(--workspace-topbar-height) - 2.5rem) / 2)",
-    "--sidebar-width": hidesThreadList ? "0px" : `${sidebarWidth}px`,
+    "--sidebar-width": `${sidebarWidth}px`,
     "--panel-animation-duration": `${panelAnimationDurationMs}ms`,
     // Panel titlebar controls start just inside the panel, right of the rail.
     "--workspace-controls-left": "calc(var(--app-rail-width) + 0.75rem)",
@@ -316,7 +361,6 @@ export function AppSidebarLayout({ children }: { children: ReactNode }) {
     <PanelAnimationSuppressionProvider value={panelAnimationsSuppressed}>
       <SidebarProvider
         className="h-dvh! min-h-0!"
-        data-thread-list-hidden={hidesThreadList ? "" : undefined}
         data-panel-animations={routePanelAnimationsActive ? "true" : "false"}
         defaultOpen
         style={sidebarProviderStyle}
@@ -329,15 +373,15 @@ export function AppSidebarLayout({ children }: { children: ReactNode }) {
           collapsible="offcanvas"
           data-app-sidebar=""
           role="navigation"
-          aria-label={isOnSettings ? "Settings" : "Threads"}
+          aria-label={pageSidebar?.label ?? "Sidebar"}
+          absent={pageSidebar === null}
           // The rail sits left of the sidebar, so header controls that clear
           // the macOS window buttons need that much less inset here.
-          className={cn(
-            isMacosDesktop &&
-              !isWindowFullscreen &&
-              "[--workspace-controls-left:max(0.75rem,calc(var(--desktop-window-controls-inset,90px)-var(--app-rail-width)))]",
-            hidesThreadList && "invisible",
-          )}
+          className={
+            isMacosDesktop && !isWindowFullscreen
+              ? "[--workspace-controls-left:max(0.75rem,calc(var(--desktop-window-controls-inset,90px)-var(--app-rail-width)))]"
+              : undefined
+          }
           resizable={{
             maxWidth: sidebarMaximumWidth,
             minWidth: THREAD_SIDEBAR_MIN_WIDTH,
@@ -348,25 +392,12 @@ export function AppSidebarLayout({ children }: { children: ReactNode }) {
             onResize: setSidebarWidth,
           }}
         >
-          {isOnSettings ? (
-            <>
-              <SidebarChromeHeader isElectron={isElectron} title="Settings" />
-              <SettingsSidebarNav pathname={pathname} />
-            </>
-          ) : legacySidebarEnabled ? (
-            <LegacyThreadSidebar />
-          ) : (
-            <ThreadSidebar />
-          )}
+          {pageSidebar?.content}
           <SidebarRail onDoubleClick={resetSidebarWidth} />
         </Sidebar>
         {children}
-        {/* The rail replaces the floating titlebar toggle: each sidebar header
-            has its own collapse button, and Threads in the rail reopens it.
-            The control still mounts for its keyboard shortcut. */}
-        <div className={cn(hidesThreadList && "hidden")}>
-          <SidebarControl />
-        </div>
+        {/* Reopens a collapsed page sidebar; pages without one have nothing to reopen. */}
+        {pageSidebar === null ? null : <SidebarControl />}
         <NavigationHistoryShortcuts />
         <MainAppLocationTracker />
       </SidebarProvider>

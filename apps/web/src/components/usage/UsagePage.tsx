@@ -101,7 +101,19 @@ function isUsageWindowDays(value: number): value is UsagePagePreferences["window
   return WINDOW_OPTIONS.some((option) => option.days === value);
 }
 
-export function UsagePage() {
+export interface UsagePageProps {
+  /** Controlled view, e.g. from the URL. Absent uses the saved preference. */
+  readonly metric?: UsageMetric;
+  readonly onMetricChange?: (metric: UsageMetric) => void;
+  /** Off when another surface (the Usage sidebar) already switches views. */
+  readonly showMetricSwitcher?: boolean;
+}
+
+export function UsagePage({
+  metric: controlledMetric,
+  onMetricChange,
+  showMetricSwitcher = true,
+}: UsagePageProps = {}) {
   const [preferences, setPreferences] = useState(readUsagePagePreferences);
   useEscapeToGoBack();
   const keybindings = useAtomValue(primaryServerKeybindingsAtom);
@@ -121,7 +133,7 @@ export function UsagePage() {
       preferences.windowDays === 1 ? "hour" : "day",
     ),
   }));
-  const metric = preferences.metric;
+  const metric = controlledMetric ?? preferences.metric;
   const showingLimits = metric === "limits";
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [limitsNow, setLimitsNow] = useState(() => Date.now());
@@ -210,6 +222,7 @@ export function UsagePage() {
     const nextPreferences = { metric: nextMetric, windowDays };
     setPreferences(nextPreferences);
     saveUsagePagePreferences(nextPreferences);
+    onMetricChange?.(nextMetric);
   };
   const refreshLimits = async (automatic = false, afterPending = false) => {
     try {
@@ -331,21 +344,23 @@ export function UsagePage() {
         </span>
       ) : null}
       <div className="ms-auto hidden min-w-0 items-center justify-end gap-2 xl:flex">
-        <ToggleGroup
-          aria-label="Usage metric"
-          variant="segmented"
-          value={[metric]}
-          onValueChange={(next) => {
-            const value = next[0];
-            if (isUsageMetric(value)) selectMetric(value);
-          }}
-        >
-          {METRIC_OPTIONS.map((option) => (
-            <Toggle key={option.value} value={option.value} title={shortcutTitle(option)}>
-              {option.label}
-            </Toggle>
-          ))}
-        </ToggleGroup>
+        {showMetricSwitcher ? (
+          <ToggleGroup
+            aria-label="Usage metric"
+            variant="segmented"
+            value={[metric]}
+            onValueChange={(next) => {
+              const value = next[0];
+              if (isUsageMetric(value)) selectMetric(value);
+            }}
+          >
+            {METRIC_OPTIONS.map((option) => (
+              <Toggle key={option.value} value={option.value} title={shortcutTitle(option)}>
+                {option.label}
+              </Toggle>
+            ))}
+          </ToggleGroup>
+        ) : null}
         {/* The period does not apply to Limits, so it stays in place but
             disabled; unmounting it shifted the metric toggle ~300px. */}
         <ToggleGroup
@@ -376,30 +391,32 @@ export function UsagePage() {
         </Button>
       </div>
       <div className="col-span-2 ms-auto flex min-w-0 items-center justify-end gap-1 xl:hidden">
-        <Select
-          value={metric}
-          onValueChange={(value) => {
-            if (isUsageMetric(value)) selectMetric(value);
-          }}
-        >
-          <SelectTrigger
-            aria-label="Usage metric"
-            size="compact"
-            variant="ghost"
-            className="w-auto min-w-0"
+        {showMetricSwitcher ? (
+          <Select
+            value={metric}
+            onValueChange={(value) => {
+              if (isUsageMetric(value)) selectMetric(value);
+            }}
           >
-            <SelectValue>
-              {METRIC_OPTIONS.find((option) => option.value === metric)?.label}
-            </SelectValue>
-          </SelectTrigger>
-          <SelectPopup align="end" alignItemWithTrigger={false}>
-            {METRIC_OPTIONS.map((option) => (
-              <SelectItem key={option.value} value={option.value} title={shortcutTitle(option)}>
-                {option.label}
-              </SelectItem>
-            ))}
-          </SelectPopup>
-        </Select>
+            <SelectTrigger
+              aria-label="Usage metric"
+              size="compact"
+              variant="ghost"
+              className="w-auto min-w-0"
+            >
+              <SelectValue>
+                {METRIC_OPTIONS.find((option) => option.value === metric)?.label}
+              </SelectValue>
+            </SelectTrigger>
+            <SelectPopup align="end" alignItemWithTrigger={false}>
+              {METRIC_OPTIONS.map((option) => (
+                <SelectItem key={option.value} value={option.value} title={shortcutTitle(option)}>
+                  {option.label}
+                </SelectItem>
+              ))}
+            </SelectPopup>
+          </Select>
+        ) : null}
         <Select
           value={String(windowDays)}
           disabled={showingLimits}
