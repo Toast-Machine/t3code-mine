@@ -75,7 +75,7 @@ export function useSkillActions() {
     setEnabled: async (...args: Parameters<typeof setEnabled>) =>
       succeeded(
         await setEnabled(...args),
-        args[0].input.enabled ? "Could not turn the skill on" : "Could not turn the skill off",
+        args[0].input.enabled ? "Could not enable the skill" : "Could not disable the skill",
       ),
     share: async (...args: Parameters<typeof share>) =>
       succeeded(await share(...args), "Could not share the skill"),

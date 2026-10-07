@@ -513,7 +513,7 @@ function SkillRow(props: { entry: SkillEntry; selected: boolean; onSelect: () =>
         <span className="truncate text-sm font-medium text-foreground">{entry.displayName}</span>
         {entry.skill.enabled ? null : (
           <Badge variant="outline" size="sm" className="shrink-0">
-            Off
+            Disabled
           </Badge>
         )}
         {entry.source === "project" || entry.source === "plugin" ? (
@@ -669,24 +669,14 @@ function SkillDetail(props: {
               </div>
             </div>
             {manageable ? (
-              <Tooltip>
-                <TooltipTrigger
-                  render={
-                    <Switch
-                      checked={entry.skill.enabled}
-                      disabled={busy !== null}
-                      onCheckedChange={(checked) => void toggle(checked)}
-                      aria-label={entry.skill.enabled ? "Turn skill off" : "Turn skill on"}
-                      className="mt-1"
-                    />
-                  }
+              <label className="mt-1 flex shrink-0 cursor-pointer items-center gap-2 text-xs text-muted-foreground">
+                {entry.skill.enabled ? "Enabled" : "Disabled"}
+                <Switch
+                  checked={entry.skill.enabled}
+                  disabled={busy !== null}
+                  onCheckedChange={(checked) => void toggle(checked)}
                 />
-                <TooltipPopup side="bottom">
-                  {entry.skill.enabled
-                    ? `On in ${entry.providerName}`
-                    : `Off in ${entry.providerName}`}
-                </TooltipPopup>
-              </Tooltip>
+              </label>
             ) : null}
           </div>
           {entry.skill.description ? (
@@ -696,7 +686,7 @@ function SkillDetail(props: {
           ) : null}
           {entry.skill.enabled && invocation === null ? null : (
             <div className="flex flex-wrap gap-1.5">
-              {entry.skill.enabled ? null : <Badge variant="warning">Turned off</Badge>}
+              {entry.skill.enabled ? null : <Badge variant="warning">Disabled</Badge>}
               {invocation ? <Badge variant="secondary">{invocation}</Badge> : null}
             </div>
           )}
