@@ -2276,9 +2276,12 @@ html.dark[data-palette]:not([data-palette=""]) {
   --message-surface: color-mix(in oklab, var(--primary) 11%, var(--background));
 }
 
-/* Header buttons (Add action, Open, Commit & PR...): flat, borderless chips. */
+/* Header buttons (Add action, Open, Commit & PR...): flat, borderless chips. A button
+   wrapped in a popover trigger (the disabled git action with its reason) takes the
+   trigger's data-slot, so it is matched separately. */
 html[data-palette]:not([data-palette=""]) [data-chat-header] [data-slot="button"],
 html[data-palette]:not([data-palette=""]) [data-chat-header] [data-slot="menu-trigger"],
+html[data-palette]:not([data-palette=""]) [data-chat-header] button[data-slot="popover-trigger"],
 html[data-palette]:not([data-palette=""]) [data-chat-header] [data-toolbar-control] {
   background-color: var(--pal-soft);
   border-color: transparent;
@@ -2286,12 +2289,18 @@ html[data-palette]:not([data-palette=""]) [data-chat-header] [data-toolbar-contr
 }
 html[data-palette]:not([data-palette=""]) [data-chat-header] [data-slot="button"]:hover,
 html[data-palette]:not([data-palette=""]) [data-chat-header] [data-slot="menu-trigger"]:hover,
+html[data-palette]:not([data-palette=""])
+  [data-chat-header]
+  button[data-slot="popover-trigger"]:hover,
 html[data-palette]:not([data-palette=""]) [data-chat-header] [data-toolbar-control]:hover {
   background-color: var(--pal-soft-hover);
 }
 /* One flat surface per chip: no bevel highlight on either half of a split button. */
 html[data-palette]:not([data-palette=""]) [data-chat-header] [data-slot="button"]::before,
 html[data-palette]:not([data-palette=""]) [data-chat-header] [data-slot="menu-trigger"]::before,
+html[data-palette]:not([data-palette=""])
+  [data-chat-header]
+  button[data-slot="popover-trigger"]::before,
 html[data-palette]:not([data-palette=""]) [data-chat-header] [data-toolbar-control]::before {
   display: none;
 }
