@@ -36,13 +36,17 @@ const TITLEBAR_HEIGHT = 40;
 // buttons are 14 points tall and do not scale with the renderer's zoom.
 const MACOS_WORKSPACE_TOPBAR_HEIGHT = 52;
 const MACOS_WINDOW_BUTTON_RADIUS = 7;
+const MACOS_INSET_LAYOUT_PADDING = 8;
 
 function syncMacosWindowButtons(window: Electron.BrowserWindow): void {
   if (window.isDestroyed() || window.isFullScreen()) return;
+  // Offset by the inset layout's padding so the buttons line up with the
+  // sidebar header row.
+  const zoom = window.webContents.getZoomFactor();
   window.setWindowButtonPosition({
-    x: 16,
+    x: 16 + Math.round(MACOS_INSET_LAYOUT_PADDING * zoom),
     y: Math.round(
-      (MACOS_WORKSPACE_TOPBAR_HEIGHT * window.webContents.getZoomFactor()) / 2 -
+      ((MACOS_WORKSPACE_TOPBAR_HEIGHT + 2 * MACOS_INSET_LAYOUT_PADDING) * zoom) / 2 -
         MACOS_WINDOW_BUTTON_RADIUS,
     ),
   });
@@ -250,8 +254,6 @@ export function concealPendingQuitWindow(
   // release-gated quit behavior but cannot make the pending window disappear.
   window.setOpacity(0);
 }
-
-const MACOS_INSET_LAYOUT_PADDING = 8;
 
 function getWindowTitleBarOptions(
   shouldUseDarkColors: boolean,
