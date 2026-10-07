@@ -22,7 +22,9 @@ const STATES = [
 // The page's own list filters (already URL search params), as sidebar views.
 export function PullRequestsSidebarNav() {
   const navigate = useNavigate({ from: "/pull-requests" });
-  const search = useSearch({ from: "/_chat/pull-requests" });
+  // The sidebar can render a frame before or after the page during a switch,
+  // so it must not require the page's match.
+  const search = useSearch({ from: "/_chat/pull-requests", shouldThrow: false });
   const update = (patch: Partial<PullRequestsSearch>) =>
     void navigate({
       search: (previous: PullRequestsSearch): PullRequestsSearch => ({ ...previous, ...patch }),
@@ -36,7 +38,7 @@ export function PullRequestsSidebarNav() {
             id: `involvement-${option.value}`,
             label: option.label,
             icon: option.icon,
-            active: search.involvement === option.value,
+            active: search?.involvement === option.value,
             onSelect: () => update({ involvement: option.value }),
           })),
         },
@@ -46,7 +48,7 @@ export function PullRequestsSidebarNav() {
             id: `state-${option.value}`,
             label: option.label,
             icon: option.icon,
-            active: search.state === option.value,
+            active: search?.state === option.value,
             onSelect: () => update({ state: option.value }),
           })),
         },

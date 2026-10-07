@@ -2694,6 +2694,11 @@ html[data-palette="deepteal"]:not([data-palette=""]) [data-app-rail] {
 html[data-palette]:not([data-palette=""]) {
   --pal-soft: color-mix(in oklab, var(--primary) 8%, var(--background));
   --pal-soft-hover: color-mix(in oklab, var(--primary) 14%, var(--background));
+}
+/* Dark panels need a stronger tint for the same soft-chip contrast. */
+html.dark[data-palette]:not([data-palette=""]) {
+  --pal-soft: color-mix(in oklab, var(--primary) 16%, var(--background));
+  --pal-soft-hover: color-mix(in oklab, var(--primary) 26%, var(--background));
   --accent: var(--pal-soft-hover);
   --toolbar-control-hover: var(--pal-soft-hover);
   --message-surface: color-mix(in oklab, var(--primary) 11%, var(--background));
@@ -2712,9 +2717,11 @@ html[data-palette]:not([data-palette=""]) [data-chat-header] [data-slot="menu-tr
 html[data-palette]:not([data-palette=""]) [data-chat-header] [data-toolbar-control]:hover {
   background-color: var(--pal-soft-hover);
 }
+/* One flat surface per chip: no bevel highlight on either half of a split button. */
 html[data-palette]:not([data-palette=""]) [data-chat-header] [data-slot="button"]::before,
+html[data-palette]:not([data-palette=""]) [data-chat-header] [data-slot="menu-trigger"]::before,
 html[data-palette]:not([data-palette=""]) [data-chat-header] [data-toolbar-control]::before {
-  box-shadow: none;
+  display: none;
 }
 
 /* Deep palettes: project icon colors use their light shades on the dark sidebar. */

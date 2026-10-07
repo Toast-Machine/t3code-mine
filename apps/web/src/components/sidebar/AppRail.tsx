@@ -1,6 +1,7 @@
 import { ChartNoAxesColumnIcon, MessagesSquareIcon, SettingsIcon } from "lucide-react";
 import type { ReactNode } from "react";
-import { useLocation, useNavigate } from "@tanstack/react-router";
+import { useLocation, useNavigate, useRouter } from "@tanstack/react-router";
+import { useEffect } from "react";
 
 import { useSidebar } from "../ui/sidebar";
 
@@ -11,6 +12,17 @@ import { readPullRequestListPreferences } from "../pullRequest/pullRequestListPr
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 import { useNavigateToMainApp } from "./mainAppLocation";
 import { SidebarPaletteMenuButton } from "./SidebarChrome";
+
+// Route chunks behind the rail: the thread views and each rail page.
+const RAIL_ROUTE_IDS = [
+  "/_chat/",
+  "/_chat/$environmentId/$threadId",
+  "/_chat/draft/$draftId",
+  "/_chat/pull-requests",
+  "/usage",
+  "/settings",
+  "/settings/general",
+] as const;
 
 // Slack-style app rail (my-tweaks trial): one icon per page of the app, left of
 // the thread sidebar. Threads is home; Pull requests, Usage, and Settings are
@@ -50,6 +62,21 @@ export function AppRail() {
   const pathname = useLocation({ select: (location) => location.pathname });
   const { environments } = useEnvironments();
   const { open, setOpen } = useSidebar();
+  const router = useRouter();
+  // Pages are split chunks. Load every rail destination once the app is idle so
+  // switching pages never renders an empty frame while code downloads.
+  useEffect(() => {
+    const preload = () => {
+      for (const id of RAIL_ROUTE_IDS) {
+        void Promise.resolve(router.loadRouteChunk(router.routesById[id])).catch(() => {});
+      }
+    };
+    const idle = window.requestIdleCallback?.(preload) ?? window.setTimeout(preload, 1500);
+    return () => {
+      if (window.cancelIdleCallback) window.cancelIdleCallback(idle);
+      else window.clearTimeout(idle);
+    };
+  }, [router]);
   const pullRequestsSupported = environments.some(
     (environment) => environment.serverConfig?.environment.capabilities.pullRequests === true,
   );

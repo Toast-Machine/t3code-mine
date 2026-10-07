@@ -14,7 +14,9 @@ const METRIC_ICONS = {
 // The Usage page's views; the selected one lives in the URL (?metric=).
 export function UsageSidebarNav() {
   const navigate = useNavigate();
-  const metric = useSearch({ from: "/usage" }).metric ?? readUsagePagePreferences().metric;
+  // Not required to match: the sidebar can render a frame apart from the page.
+  const metric =
+    useSearch({ from: "/usage", shouldThrow: false })?.metric ?? readUsagePagePreferences().metric;
   return (
     <PageSidebarNav
       sections={[

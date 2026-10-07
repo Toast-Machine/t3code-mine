@@ -1,12 +1,14 @@
 export const THREAD_SIDEBAR_WIDTH_STORAGE_KEY = "chat_thread_sidebar_width";
 const THREAD_SIDEBAR_DEFAULT_WIDTH = 16 * 16;
 export const THREAD_SIDEBAR_MIN_WIDTH = 13 * 16;
+// A list of titles stops gaining from width well before the window does.
+const THREAD_SIDEBAR_MAX_WIDTH = 28 * 16;
 export const THREAD_MAIN_CONTENT_MIN_WIDTH = 40 * 16;
 
 export function resolveThreadSidebarMaximumWidth(viewportWidth: number): number {
   return Math.max(
     THREAD_SIDEBAR_MIN_WIDTH,
-    Math.floor(viewportWidth) - THREAD_MAIN_CONTENT_MIN_WIDTH,
+    Math.min(THREAD_SIDEBAR_MAX_WIDTH, Math.floor(viewportWidth) - THREAD_MAIN_CONTENT_MIN_WIDTH),
   );
 }
 

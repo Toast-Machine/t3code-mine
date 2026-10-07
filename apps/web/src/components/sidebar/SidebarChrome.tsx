@@ -8,8 +8,6 @@ import { cn } from "../../lib/utils";
 import { useEnvironments } from "../../state/environments";
 import {
   resolveEnvironmentIdentificationPillLabel,
-  resolveSidebarStageBackdropVariant,
-  SidebarStageBackdrop,
   useEnvironmentStageLabel,
 } from "../SidebarStageBackdrop";
 import { Badge } from "../ui/badge";
@@ -40,10 +38,6 @@ export const SidebarChromeHeader = memo(function SidebarChromeHeader({
 }) {
   const stageLabel = useEnvironmentStageLabel();
   const environmentIdentificationMode = useEnvironmentIdentificationMode();
-  const backdropVariant = resolveSidebarStageBackdropVariant(
-    stageLabel,
-    environmentIdentificationMode === "artwork",
-  );
   const pillLabel =
     environmentIdentificationMode === "pill"
       ? resolveEnvironmentIdentificationPillLabel(stageLabel)
@@ -57,12 +51,9 @@ export const SidebarChromeHeader = memo(function SidebarChromeHeader({
         isElectron && "drag-region",
       )}
     >
-      {backdropVariant ? <SidebarStageBackdrop variant={backdropVariant} /> : null}
-      <SidebarTrigger
-        // Over the stage artwork: the media viewer's control-on-imagery treatment.
-        variant={backdropVariant ? "media-navigation" : "ghost"}
-        className="relative top-auto z-10 translate-y-0 md:hidden"
-      />
+      {/* No stage artwork: the titled header replaces the banner; dev and
+          nightly builds can still be marked with the pill setting. */}
+      <SidebarTrigger variant="ghost" className="relative top-auto z-10 translate-y-0 md:hidden" />
       {/* Every sidebar shares this header: its page title and a collapse button. */}
       <h2 className="min-w-0 flex-1 truncate text-base font-semibold tracking-tight text-sidebar-foreground">
         {title}
