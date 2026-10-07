@@ -91,7 +91,7 @@ export function AppRail() {
       aria-label="App"
       data-app-sidebar=""
       data-app-rail=""
-      className="drag-region relative z-20 hidden h-dvh w-(--app-rail-width) shrink-0 flex-col items-center gap-1.5 bg-sidebar-shell pt-(--app-rail-top) pb-3 md:flex [&_button]:[-webkit-app-region:no-drag]"
+      className="relative z-20 hidden h-[calc(100dvh-var(--app-topbar-height))] w-(--app-rail-width) shrink-0 flex-col items-center gap-1.5 bg-sidebar-shell pt-(--app-rail-top) pb-3 md:flex [&_button]:[-webkit-app-region:no-drag]"
     >
       <RailButton
         label="Threads"

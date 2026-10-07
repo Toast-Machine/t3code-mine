@@ -157,7 +157,7 @@ function SidebarProvider({
       <div
         // Inset layouts opt into bg-sidebar through className.
         className={cn(
-          "group/sidebar-wrapper flex min-h-svh w-full has-data-[variant=inset]:bg-sidebar-shell max-sm:[--workspace-titlebar-control-size:--spacing(8)]",
+          "group/sidebar-wrapper flex min-h-svh w-full pt-(--app-topbar-height,0px) has-data-[variant=inset]:bg-sidebar-shell max-sm:[--workspace-titlebar-control-size:--spacing(8)]",
           className,
         )}
         data-sidebar-state={state}
@@ -299,6 +299,8 @@ function Sidebar({
         <div
           className={cn(
             "fixed inset-y-0 z-10 hidden h-svh w-(--sidebar-width) md:flex",
+            // Shells with a top bar (--app-topbar-height) start below it.
+            "top-(--app-topbar-height,0px) h-[calc(100svh-var(--app-topbar-height,0px))]",
             "[[data-panel-animations=true]_&]:transition-[left,right,width] [[data-panel-animations=true]_&]:[transition-duration:var(--panel-animation-duration)] [[data-panel-animations=true]_&]:ease-out",
             side === "left"
               ? "left-(--app-rail-width,0px) group-data-[collapsible=offcanvas]:left-[calc(var(--app-rail-width,0px)-var(--sidebar-width))]"
@@ -559,7 +561,7 @@ function SidebarInset({ className, ...props }: React.ComponentProps<"main">) {
     <main
       className={cn(
         "relative flex min-w-0 w-full flex-1 flex-col bg-background surface-grain",
-        "md:peer-data-[variant=inset]:m-2 md:peer-data-[variant=inset]:ms-0 md:peer-data-[variant=inset]:h-[calc(100dvh-1rem)] md:peer-data-[variant=inset]:overflow-hidden md:peer-data-[variant=inset]:rounded-xl md:peer-data-[variant=inset]:bg-clip-padding md:peer-data-[variant=inset]:border md:peer-data-[variant=inset]:border-border/60 md:peer-data-[variant=inset]:peer-data-[state=expanded]:rounded-s-none",
+        "md:peer-data-[variant=inset]:m-2 md:peer-data-[variant=inset]:ms-0 md:peer-data-[variant=inset]:h-[calc(100dvh-1rem-var(--app-topbar-height,0px))] md:peer-data-[variant=inset]:overflow-hidden md:peer-data-[variant=inset]:rounded-xl md:peer-data-[variant=inset]:bg-clip-padding md:peer-data-[variant=inset]:border md:peer-data-[variant=inset]:border-border/60 md:peer-data-[variant=inset]:peer-data-[state=expanded]:rounded-s-none",
         className,
       )}
       data-slot="sidebar-inset"

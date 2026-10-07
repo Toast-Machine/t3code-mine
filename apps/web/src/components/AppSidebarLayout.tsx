@@ -35,6 +35,7 @@ import LegacyThreadSidebar from "./LegacySidebar";
 import ThreadSidebar from "./Sidebar";
 import { SettingsSidebarNav } from "./settings/SettingsSidebarNav";
 import { AppRail } from "./sidebar/AppRail";
+import { AppTopBar } from "./sidebar/AppTopBar";
 import { PullRequestsSidebarNav } from "./pullRequest/PullRequestsSidebarNav";
 import { UsageSidebarNav } from "./usage/UsageSidebarNav";
 import { SidebarChromeHeader } from "./sidebar/SidebarChrome";
@@ -302,16 +303,16 @@ export function AppSidebarLayout({ children }: { children: ReactNode }) {
       : false;
   });
   const sidebarProviderStyle = {
-    // The rail owns the whole left gutter up to the panel, so its icons center
-    // by layout alone. On macOS the window buttons are its top item, centered in
-    // the same width (see macosWindowButtonPosition in the desktop app).
+    // Shell geometry. The top bar spans the window (holding the macOS window
+    // buttons, centered over the rail); the rail owns the left gutter up to the
+    // panel, so its icons center by layout alone; its first icon aligns with
+    // the panel's top edge. The desktop app mirrors these numbers in
+    // macosWindowButtonPosition.
+    "--app-topbar-height": "2.25rem",
+    "--app-topbar-start": isMacosDesktop && !isWindowFullscreen ? "5rem" : "0.75rem",
     "--app-rail-width": "4.5rem",
-    // First rail icon: centered on the page sidebar's title row, or on macOS
-    // (where the window buttons own that row) aligned with the search row.
-    "--app-rail-top":
-      isMacosDesktop && !isWindowFullscreen
-        ? "calc(var(--workspace-topbar-height) + 1rem)"
-        : "calc(0.5rem + (var(--workspace-topbar-height) - 2.5rem) / 2)",
+    "--app-rail-top": "0.5rem",
+    "--workspace-controls-top": "var(--app-topbar-height)",
     "--sidebar-width": `${sidebarWidth}px`,
     "--panel-animation-duration": `${panelAnimationDurationMs}ms`,
     // Panel titlebar controls start just inside the panel, right of the rail.
@@ -368,6 +369,7 @@ export function AppSidebarLayout({ children }: { children: ReactNode }) {
         style={sidebarProviderStyle}
       >
         <ProjectProjectionRetention />
+        <AppTopBar />
         <AppRail />
         <Sidebar
           side="left"

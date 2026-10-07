@@ -299,7 +299,7 @@ function themeRules(theme: ColorTheme): string {
 }`;
       // A dark frame in light mode needs light-on-dark rail controls.
       return mode === "light" && isDarkColor(colors.shell)
-        ? `${base}\n${selector} [data-app-rail] {${ON_DARK_FRAME}\n}`
+        ? `${base}\n${selector} [data-app-rail],\n${selector} [data-app-topbar] {${ON_DARK_FRAME}\n}`
         : base;
     })
     .join("\n");
