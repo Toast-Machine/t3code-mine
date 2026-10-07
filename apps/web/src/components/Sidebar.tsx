@@ -568,7 +568,7 @@ function SortableThreadRow(props: {
 
 // Flat, Arc-like surfaces: list rows have no fill at rest, the open row is
 // solid, and only rows that need you get a pastel fill.
-const restSurfaceClassName = "bg-transparent hover:bg-black/[0.04] dark:hover:bg-white/[0.05]";
+const restSurfaceClassName = "bg-transparent hover:bg-white/55 dark:hover:bg-white/[0.06]";
 const activeSurfaceClassName = "bg-white dark:bg-white/[0.12]";
 const selectedSurfaceClassName = "bg-white/60 dark:bg-white/[0.08]";
 // Pinned tiles are the one filled element at rest, like Arc's favorites.
@@ -1541,21 +1541,13 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: {
       aria-hidden
       className={cn(
         "min-w-0 flex-1 text-sm transition-opacity motion-reduce:transition-none",
-        variant === "card"
-          ? props.isActive || needsAttentionFill
-            ? "font-medium"
-            : "font-normal"
-          : shouldRecede
-            ? "font-normal"
-            : "font-medium",
+        variant === "card" ? "font-semibold" : shouldRecede ? "font-normal" : "font-medium",
         variant === "card"
           ? // Every card title reads the same; only the open thread and threads
             // waiting on you step up in weight.
             cn(
               "truncate",
-              props.isActive || needsAttentionFill
-                ? "text-foreground"
-                : "text-foreground/80 group-hover/sidebar-row:text-foreground",
+              props.isActive || needsAttentionFill ? "text-foreground" : "text-foreground/85",
             )
           : cn(
               "truncate group-focus-within/sidebar-row:text-foreground group-hover/sidebar-row:text-foreground",
@@ -1903,8 +1895,8 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: {
       {...sortableRootProps}
       {...(fileDropHandlers ?? {})}
       className={cn(
-        // Matches the h-9 content box; the py-0.5 padding is added on top.
-        "list-none py-0.5 [content-visibility:auto] [contain-intrinsic-size:auto_40px]",
+        // Matches the h-12 content box; the py-0.5 padding is added on top.
+        "list-none py-0.5 [content-visibility:auto] [contain-intrinsic-size:auto_52px]",
         sortable?.isDragging && "relative z-20",
       )}
     >
@@ -1928,22 +1920,16 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: {
           }
         >
           {accessibleTitle}
-          {/* One calm line: project icon, title, then status or time. Branch,
-              agent, and machine details live in the hover tooltip. */}
-          <div className="relative z-10 flex h-9 items-center px-(--sidebar-row-content-inset)">
-            <div className="flex h-5 min-w-0 flex-1 items-center gap-2">
+          {/* Two calm lines: icon, title, and status or time on top; a quiet
+              gray line under the title for project and PR. Branch, agent, and
+              machine details live in the hover tooltip. */}
+          <div className="relative z-10 flex h-12 flex-col justify-center gap-0.5 px-(--sidebar-row-content-inset)">
+            <div className="flex h-5 min-w-0 items-center gap-2">
               {props.project ? (
                 <ProjectFavicon project={props.project} className="size-4 shrink-0" />
               ) : null}
               {draftIndicator}
               {title}
-              {terminalStatusIcon}
-              {prBadge ? (
-                // Metadata stays gray at rest; color is reserved for status.
-                <span className="inline-flex shrink-0 opacity-55 grayscale transition group-hover/sidebar-row:opacity-100 group-hover/sidebar-row:grayscale-0">
-                  {prBadge}
-                </span>
-              ) : null}
               {pinIndicator}
               {/* The visible state owns this slot's width: status at rest,
                   actions on hover/keyboard focus or while the popover is open. Keeping
@@ -2086,6 +2072,14 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: {
                 Regenerating title
               </span>
             ) : null}
+            {/* Metadata stays gray at rest; color is reserved for status. */}
+            <div className="flex h-4 min-w-0 items-center gap-1.5 pl-6 text-xs text-muted-foreground/70">
+              <span className="min-w-0 flex-1 truncate">{props.projectDisplayName ?? ""}</span>
+              {terminalStatusIcon}
+              {prBadge ? (
+                <span className="inline-flex shrink-0 opacity-60 grayscale">{prBadge}</span>
+              ) : null}
+            </div>
           </div>
           {props.jumpLabel ? <JumpHintBadge label={props.jumpLabel} /> : null}
         </TooltipTrigger>
