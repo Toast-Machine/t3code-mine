@@ -2295,6 +2295,14 @@ html[data-palette]:not([data-palette=""])
 html[data-palette]:not([data-palette=""]) [data-chat-header] [data-toolbar-control]:hover {
   background-color: var(--pal-soft-hover);
 }
+/* A disabled chip stays hoverable so it can explain why, but must not light up or
+   press like a live button. */
+html[data-palette]:not([data-palette=""]) [data-chat-header] button[aria-disabled="true"]:hover {
+  background-color: var(--pal-soft);
+}
+html[data-palette]:not([data-palette=""]) [data-chat-header] button[aria-disabled="true"]:active {
+  scale: none;
+}
 /* One flat surface per chip: no bevel highlight on either half of a split button. */
 html[data-palette]:not([data-palette=""]) [data-chat-header] [data-slot="button"]::before,
 html[data-palette]:not([data-palette=""]) [data-chat-header] [data-slot="menu-trigger"]::before,
