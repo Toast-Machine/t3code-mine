@@ -1,7 +1,6 @@
 > **Personal fork.** This checkout is the maintainer's personal build, "T3 Code (Mine)": upstream
-> T3 Code plus a thin layer of design changes, rebased onto each stable release. Read
-> [FORK.md](./FORK.md) before making changes. Its rules (keep upstream updatable, no
-> hacks, never touch `~/.t3/userdata`) take priority where they differ from this file.
+> T3 Code with his design on top, moved onto each stable release. See
+> [FORK.md](./FORK.md) for the idea and how to build, install, and update it.
 
 # T3 Code
 
