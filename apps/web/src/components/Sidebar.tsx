@@ -121,6 +121,7 @@ import {
 import { legacyProjectCwdPreferenceKey, useUiStateStore } from "../uiStateStore";
 import { usePinIcon } from "../pinIcons";
 import { PinIconDialog } from "./PinIconDialog";
+import { pinLineIcon } from "./pinLineIcons";
 import {
   getThreadKeysToDeselectAfterDelete,
   useThreadSelectionStore,
@@ -1195,6 +1196,7 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: {
   // switching sidebars must not light up every historical thread as unread.
   const isUnread = hasUnseenCompletion({ ...thread, lastVisitedAt });
   const pinEmoji = usePinIcon(threadKey);
+  const PinLineIcon = pinEmoji === null ? null : pinLineIcon(pinEmoji);
   const markThreadUnread = useUiStateStore((state) => state.markThreadUnread);
   const markThreadVisited = useUiStateStore((state) => state.markThreadVisited);
   const canToggleRead = thread.latestTurn?.completedAt != null;
@@ -1736,7 +1738,9 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: {
             }
           >
             {accessibleTitle}
-            {pinEmoji !== null ? (
+            {PinLineIcon !== null ? (
+              <PinLineIcon aria-hidden className="size-4 shrink-0 text-sidebar-foreground/85" />
+            ) : pinEmoji !== null ? (
               <span aria-hidden className="text-base leading-none">
                 {pinEmoji}
               </span>

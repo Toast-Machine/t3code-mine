@@ -41,7 +41,8 @@ export function usePinIcon(threadKey: string): string | null {
   );
 }
 
-export const PIN_ICON_CHOICES = [
+// Values are either "icon:<name>" (a line icon from PIN_LINE_ICONS) or an emoji.
+export const PIN_EMOJI_CHOICES = [
   "📚",
   "🎨",
   "✉️",
