@@ -229,6 +229,9 @@ export function AppSidebarLayout({ children }: { children: ReactNode }) {
   const panelAnimationsSuppressed = usePanelNavigationSuppression(pathname);
   const routePanelAnimationsActive = panelAnimationsActive && !panelAnimationsSuppressed;
   const isOnSettings = pathname === "/settings" || pathname.startsWith("/settings/");
+  // The thread list belongs to the chat area; full pages opened from the rail
+  // (Pull requests, Usage) take the whole width instead.
+  const hidesThreadList = pathname.startsWith("/usage") || pathname.startsWith("/pull-requests");
   const isMacosDesktop = isElectron && isMacPlatform(navigator.platform);
   const [sidebarWidth, setSidebarWidth] = useState(readInitialThreadSidebarWidth);
   // Subscribed rather than read once: the clamp must track live window size,
@@ -251,8 +254,9 @@ export function AppSidebarLayout({ children }: { children: ReactNode }) {
       : false;
   });
   const sidebarProviderStyle = {
-    "--app-rail-width": "4rem",
-    "--sidebar-width": `${sidebarWidth}px`,
+    // Wide enough on macOS to hold the window buttons above the rail icons.
+    "--app-rail-width": isMacosDesktop && !isWindowFullscreen ? "5.5rem" : "4rem",
+    "--sidebar-width": hidesThreadList ? "0px" : `${sidebarWidth}px`,
     "--panel-animation-duration": `${panelAnimationDurationMs}ms`,
     ...(isMacosDesktop && !isWindowFullscreen
       ? { "--workspace-controls-left": MACOS_TRAFFIC_LIGHTS_LEFT_INSET }
@@ -300,6 +304,7 @@ export function AppSidebarLayout({ children }: { children: ReactNode }) {
     <PanelAnimationSuppressionProvider value={panelAnimationsSuppressed}>
       <SidebarProvider
         className="h-dvh! min-h-0!"
+        data-thread-list-hidden={hidesThreadList ? "" : undefined}
         data-panel-animations={routePanelAnimationsActive ? "true" : "false"}
         defaultOpen
         style={sidebarProviderStyle}
@@ -315,11 +320,12 @@ export function AppSidebarLayout({ children }: { children: ReactNode }) {
           aria-label={isOnSettings ? "Settings" : "Threads"}
           // The rail sits left of the sidebar, so header controls that clear
           // the macOS window buttons need that much less inset here.
-          className={
-            isMacosDesktop && !isWindowFullscreen
-              ? "[--workspace-controls-left:max(0.75rem,calc(var(--desktop-window-controls-inset,90px)-var(--app-rail-width)))]"
-              : undefined
-          }
+          className={cn(
+            isMacosDesktop &&
+              !isWindowFullscreen &&
+              "[--workspace-controls-left:max(0.75rem,calc(var(--desktop-window-controls-inset,90px)-var(--app-rail-width)))]",
+            hidesThreadList && "invisible",
+          )}
           resizable={{
             maxWidth: sidebarMaximumWidth,
             minWidth: THREAD_SIDEBAR_MIN_WIDTH,
@@ -343,7 +349,7 @@ export function AppSidebarLayout({ children }: { children: ReactNode }) {
           <SidebarRail onDoubleClick={resetSidebarWidth} />
         </Sidebar>
         {children}
-        <SidebarControl />
+        {hidesThreadList ? null : <SidebarControl />}
         <NavigationHistoryShortcuts />
         <MainAppLocationTracker />
       </SidebarProvider>

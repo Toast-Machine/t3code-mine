@@ -257,6 +257,9 @@ html[data-mobile-composer-route-transition="true"]::view-transition-old(t3-mobil
   /* Flat pastel shell behind the inset sidebar layout: the sidebar color with
      a light wash of the info hue, so it follows every theme and dark mode. */
   --color-sidebar-shell: var(--pal-shell, var(--sidebar));
+  /* Thread list inside the panel: a soft tint of the theme color, lighter in
+     light mode and deeper in dark mode, like Slack's channel list. */
+  --color-sidebar-list: var(--pal-list, var(--background));
   /* Soft filled surface shared by the search bar and pinned tiles. */
   --color-chip: var(--pal-chip, color-mix(in oklab, var(--foreground) 6%, transparent));
   --color-row-hover: var(--pal-row-hover);
@@ -2505,21 +2508,13 @@ html.dark[data-palette="meadow"]:not([data-palette=""]) {
    its toggle flip to light-on-dark, including lighter status hues. */
 html[data-palette="blueberry"]:not([data-palette=""]) {
   --pal-shell: #1e3150;
-  --pal-chip: rgb(255 255 255 / 0.1);
-  --pal-row-hover: rgb(255 255 255 / 0.07);
-  --pal-row-active: rgb(255 255 255 / 0.17);
-  --pal-row-selected: rgb(255 255 255 / 0.11);
   --primary: #2f5c94;
   --primary-foreground: #ffffff;
   --message-action: #2f5c94;
   --message-action-foreground: #ffffff;
   --ring: #2f5c94;
 }
-html[data-palette="blueberry"]:not([data-palette=""]) [data-slot="sidebar"],
-html[data-palette="blueberry"]:not([data-palette=""]) [data-app-sidebar],
-html[data-palette="blueberry"]:not([data-palette=""])
-  [data-sidebar-state="expanded"]
-  [data-sidebar-control] {
+html[data-palette="blueberry"]:not([data-palette=""]) [data-app-rail] {
   --contrast-sidebar-foreground: #ffffff;
   --muted: rgb(255 255 255 / 0.12);
   --contrast-foreground: #ffffff;
@@ -2549,21 +2544,13 @@ html[data-palette="blueberry"]:not([data-palette=""])
 }
 html[data-palette="forest"]:not([data-palette=""]) {
   --pal-shell: #173a2f;
-  --pal-chip: rgb(255 255 255 / 0.1);
-  --pal-row-hover: rgb(255 255 255 / 0.07);
-  --pal-row-active: rgb(255 255 255 / 0.17);
-  --pal-row-selected: rgb(255 255 255 / 0.11);
   --primary: #235c49;
   --primary-foreground: #ffffff;
   --message-action: #235c49;
   --message-action-foreground: #ffffff;
   --ring: #235c49;
 }
-html[data-palette="forest"]:not([data-palette=""]) [data-slot="sidebar"],
-html[data-palette="forest"]:not([data-palette=""]) [data-app-sidebar],
-html[data-palette="forest"]:not([data-palette=""])
-  [data-sidebar-state="expanded"]
-  [data-sidebar-control] {
+html[data-palette="forest"]:not([data-palette=""]) [data-app-rail] {
   --contrast-sidebar-foreground: #ffffff;
   --muted: rgb(255 255 255 / 0.12);
   --contrast-foreground: #ffffff;
@@ -2593,21 +2580,13 @@ html[data-palette="forest"]:not([data-palette=""])
 }
 html[data-palette="rosewood"]:not([data-palette=""]) {
   --pal-shell: #6a3450;
-  --pal-chip: rgb(255 255 255 / 0.1);
-  --pal-row-hover: rgb(255 255 255 / 0.07);
-  --pal-row-active: rgb(255 255 255 / 0.17);
-  --pal-row-selected: rgb(255 255 255 / 0.11);
   --primary: #8c4467;
   --primary-foreground: #ffffff;
   --message-action: #8c4467;
   --message-action-foreground: #ffffff;
   --ring: #8c4467;
 }
-html[data-palette="rosewood"]:not([data-palette=""]) [data-slot="sidebar"],
-html[data-palette="rosewood"]:not([data-palette=""]) [data-app-sidebar],
-html[data-palette="rosewood"]:not([data-palette=""])
-  [data-sidebar-state="expanded"]
-  [data-sidebar-control] {
+html[data-palette="rosewood"]:not([data-palette=""]) [data-app-rail] {
   --contrast-sidebar-foreground: #ffffff;
   --muted: rgb(255 255 255 / 0.12);
   --contrast-foreground: #ffffff;
@@ -2637,21 +2616,13 @@ html[data-palette="rosewood"]:not([data-palette=""])
 }
 html[data-palette="plum"]:not([data-palette=""]) {
   --pal-shell: #382356;
-  --pal-chip: rgb(255 255 255 / 0.1);
-  --pal-row-hover: rgb(255 255 255 / 0.07);
-  --pal-row-active: rgb(255 255 255 / 0.17);
-  --pal-row-selected: rgb(255 255 255 / 0.11);
   --primary: #5b3d8c;
   --primary-foreground: #ffffff;
   --message-action: #5b3d8c;
   --message-action-foreground: #ffffff;
   --ring: #5b3d8c;
 }
-html[data-palette="plum"]:not([data-palette=""]) [data-slot="sidebar"],
-html[data-palette="plum"]:not([data-palette=""]) [data-app-sidebar],
-html[data-palette="plum"]:not([data-palette=""])
-  [data-sidebar-state="expanded"]
-  [data-sidebar-control] {
+html[data-palette="plum"]:not([data-palette=""]) [data-app-rail] {
   --contrast-sidebar-foreground: #ffffff;
   --muted: rgb(255 255 255 / 0.12);
   --contrast-foreground: #ffffff;
@@ -2681,21 +2652,13 @@ html[data-palette="plum"]:not([data-palette=""])
 }
 html[data-palette="deepteal"]:not([data-palette=""]) {
   --pal-shell: #0f4746;
-  --pal-chip: rgb(255 255 255 / 0.1);
-  --pal-row-hover: rgb(255 255 255 / 0.07);
-  --pal-row-active: rgb(255 255 255 / 0.17);
-  --pal-row-selected: rgb(255 255 255 / 0.11);
   --primary: #14625f;
   --primary-foreground: #ffffff;
   --message-action: #14625f;
   --message-action-foreground: #ffffff;
   --ring: #14625f;
 }
-html[data-palette="deepteal"]:not([data-palette=""]) [data-slot="sidebar"],
-html[data-palette="deepteal"]:not([data-palette=""]) [data-app-sidebar],
-html[data-palette="deepteal"]:not([data-palette=""])
-  [data-sidebar-state="expanded"]
-  [data-sidebar-control] {
+html[data-palette="deepteal"]:not([data-palette=""]) [data-app-rail] {
   --contrast-sidebar-foreground: #ffffff;
   --muted: rgb(255 255 255 / 0.12);
   --contrast-foreground: #ffffff;
@@ -2755,11 +2718,11 @@ html[data-palette]:not([data-palette=""]) [data-chat-header] [data-toolbar-contr
 }
 
 /* Deep palettes: project icon colors use their light shades on the dark sidebar. */
-html[data-palette="blueberry"]:not([data-palette=""]) [data-app-sidebar],
-html[data-palette="forest"]:not([data-palette=""]) [data-app-sidebar],
-html[data-palette="rosewood"]:not([data-palette=""]) [data-app-sidebar],
-html[data-palette="plum"]:not([data-palette=""]) [data-app-sidebar],
-html[data-palette="deepteal"]:not([data-palette=""]) [data-app-sidebar] {
+html[data-palette="blueberry"]:not([data-palette=""]) [data-app-rail],
+html[data-palette="forest"]:not([data-palette=""]) [data-app-rail],
+html[data-palette="rosewood"]:not([data-palette=""]) [data-app-rail],
+html[data-palette="plum"]:not([data-palette=""]) [data-app-rail],
+html[data-palette="deepteal"]:not([data-palette=""]) [data-app-rail] {
   --color-amber-600: var(--color-amber-300);
   --color-blue-600: var(--color-blue-300);
   --color-cyan-600: var(--color-cyan-300);
@@ -2794,4 +2757,35 @@ html[data-palette]:not([data-palette=""])
   > [data-slot="separator"]::before {
   inset: 28% 0;
   background-color: color-mix(in oklab, var(--foreground) 18%, transparent);
+}
+
+/* Panel-sidebar trial: the thread list sits inside the rounded content panel,
+   so its surfaces are the panel's soft palette tints rather than shell ones. */
+html[data-palette]:not([data-palette=""]) [data-slot="sidebar"] {
+  --pal-chip: var(--pal-soft);
+  --pal-row-hover: var(--pal-soft);
+  --pal-row-active: var(--pal-soft-hover);
+  --pal-row-selected: var(--pal-soft);
+}
+/* Rail surfaces on deep palettes: translucent white over the deep shell. */
+html[data-palette="blueberry"] [data-app-rail],
+html[data-palette="forest"] [data-app-rail],
+html[data-palette="rosewood"] [data-app-rail],
+html[data-palette="plum"] [data-app-rail],
+html[data-palette="deepteal"] [data-app-rail] {
+  --pal-row-hover: rgb(255 255 255 / 0.08);
+  --pal-row-active: rgb(255 255 255 / 0.17);
+}
+
+html[data-palette]:not([data-palette=""]) {
+  --pal-list: color-mix(in oklab, var(--pal-shell) 22%, var(--background));
+}
+html.dark[data-palette]:not([data-palette=""]) {
+  --pal-list: color-mix(in oklab, var(--pal-shell) 55%, var(--background));
+}
+html[data-palette]:not([data-palette=""]) [data-slot="sidebar"] {
+  --pal-chip: color-mix(in oklab, var(--foreground) 6%, transparent);
+  --pal-row-hover: color-mix(in oklab, var(--foreground) 6%, transparent);
+  --pal-row-active: var(--background);
+  --pal-row-selected: color-mix(in oklab, var(--background) 60%, transparent);
 }
