@@ -47,6 +47,8 @@ import {
   reduceDesktopUpdateStateOnUpdateAvailable,
 } from "./updateMachine.ts";
 
+const MY_TWEAKS_BUILD = true;
+
 const AUTO_UPDATE_STARTUP_DELAY = "15 seconds";
 const AUTO_UPDATE_POLL_INTERVAL = "4 minutes";
 const PREPARED_INSTALL_CHECK_WAIT = Duration.seconds(90);
@@ -262,6 +264,11 @@ function getAutoUpdateDisabledReason(args: {
   }
   if (args.disabledByEnv) {
     return "Automatic updates are disabled by the T3CODE_DISABLE_AUTO_UPDATE setting.";
+  }
+  // Personal build: updating would replace it with the official app and drop
+  // these customizations. New releases are merged in by hand instead.
+  if (MY_TWEAKS_BUILD) {
+    return "Automatic updates are off in this personal build of T3 Code.";
   }
   if (args.platform === "linux" && !args.appImage && !args.isDebPackage) {
     return "Automatic updates on Linux require the AppImage or the .deb package.";
