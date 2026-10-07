@@ -1071,6 +1071,11 @@ export const DESKTOP_EXTRA_RESOURCES = [
     from: "apps/desktop/prod-resources/resource-monitor",
     to: "resource-monitor",
   },
+  // Personal build: Dock icons that follow the selected color palette.
+  {
+    from: "apps/desktop/resources/palette-icons",
+    to: "palette-icons",
+  },
 ] as const;
 export const LINUX_CAPTURE_EXTRA_RESOURCES = [
   {

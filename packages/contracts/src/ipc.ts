@@ -1128,6 +1128,8 @@ export interface DesktopBridge {
   /** The desktop client's OS platform, read from Electron's preload process. */
   getClientPlatform?: () => string;
   setNotificationBadge?: (badge: { count: number; image: string | null }) => Promise<void>;
+  /** Personal build: switch the macOS Dock icon to the palette's icon. */
+  setDockPaletteIcon?: (palette: string) => Promise<void>;
   onNotificationBadgeClear?: (listener: () => void) => () => void;
   onTrackpadScrollEnd?: (listener: () => void) => () => void;
   /**

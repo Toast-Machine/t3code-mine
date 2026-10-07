@@ -33,8 +33,14 @@ function readPalette(): PaletteId {
   return DEFAULT_PALETTE;
 }
 
+function syncDockIcon(id: PaletteId): void {
+  void window.desktopBridge?.setDockPaletteIcon?.(id).catch(() => {});
+}
+
 export function applyStoredPalette(): void {
-  document.documentElement.dataset.palette = readPalette();
+  const palette = readPalette();
+  document.documentElement.dataset.palette = palette;
+  syncDockIcon(palette);
 }
 
 export function setPalette(id: PaletteId): void {
@@ -44,6 +50,7 @@ export function setPalette(id: PaletteId): void {
     // Still apply it for this session.
   }
   document.documentElement.dataset.palette = id;
+  syncDockIcon(id);
   for (const listener of listeners) listener();
 }
 
