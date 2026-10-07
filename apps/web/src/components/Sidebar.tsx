@@ -572,16 +572,11 @@ const restSurfaceClassName = "bg-transparent hover:bg-white/55 dark:hover:bg-whi
 const activeSurfaceClassName = "bg-white dark:bg-white/[0.12]";
 const selectedSurfaceClassName = "bg-white/60 dark:bg-white/[0.08]";
 // Pinned tiles are the one filled element at rest, like Arc's favorites.
-const tileRestSurfaceClassName =
-  "bg-black/[0.045] hover:bg-black/[0.07] dark:bg-white/[0.06] dark:hover:bg-white/[0.09]";
+const tileRestSurfaceClassName = "bg-chip hover:bg-chip/70";
 // Unsent work shares one look: the new-thread draft rows and thread rows
 // with unsent composer text both use this tint and pen so they read alike.
 const draftSurfaceClassName = "bg-warning/8 hover:bg-warning/12";
 const draftPenClassName = "size-3 shrink-0 text-warning-foreground";
-// Rows waiting on you are filled as a whole so they stand out at a glance:
-// pastel green for an unread finished turn, pastel amber for input or approval.
-const doneSurfaceClassName = "bg-success/14 hover:bg-success/20";
-const needsYouSurfaceClassName = "bg-warning/16 hover:bg-warning/22";
 
 // Structural list items — the section headers and the
 // empty-section placeholders — take part in the sortable list so they shift
@@ -681,6 +676,38 @@ function SidebarDragBoundary(props: {
         </div>
       ) : null}
     </SortableSidebarMarker>
+  );
+}
+
+const COLLAPSED_GROUPS_STORAGE_KEY = "t3code:sidebar-collapsed-groups";
+
+// One section title style for every group (Needs you, Working, Open,
+// Snoozed, Settled). Clicking it collapses or expands the group.
+function SidebarGroupLabel(props: {
+  label: string;
+  count: number;
+  expanded: boolean;
+  onToggle: () => void;
+}) {
+  return (
+    <li className="list-none pt-2">
+      <button
+        type="button"
+        onClick={props.onToggle}
+        aria-expanded={props.expanded}
+        className="group/label flex h-7 w-full cursor-pointer items-center gap-1.5 rounded-lg px-2 text-left text-xs font-semibold text-sidebar-muted-foreground outline-none hover:text-sidebar-foreground focus-visible:ring-2 focus-visible:ring-ring"
+      >
+        {props.label}
+        <span className="font-medium text-sidebar-muted-foreground/60">{props.count}</span>
+        <ChevronDownIcon
+          aria-hidden
+          className={cn(
+            "ml-auto size-3.5 opacity-0 transition group-hover/label:opacity-100 group-focus-visible/label:opacity-100",
+            !props.expanded && "-rotate-90 opacity-100",
+          )}
+        />
+      </button>
+    </li>
   );
 }
 
@@ -1459,7 +1486,7 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: {
   const needsAttentionFill =
     topStatus?.icon === "done" || topStatus?.icon === "input" || topStatus?.icon === "approval";
   const rowSurfaceClassName = cn(
-    "group/sidebar-row relative w-full cursor-pointer overflow-hidden rounded-xl text-left text-sidebar-foreground outline-none select-none transition-colors focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring motion-reduce:transition-none",
+    "group/sidebar-row relative w-full cursor-pointer overflow-hidden rounded-xl text-left text-sidebar-foreground outline-none select-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring",
     variantAction === "unsettle" && "[&:not(:hover):not(:focus-within)_*]:text-secondary-label/70",
     props.isActive
       ? activeSurfaceClassName
@@ -1467,11 +1494,7 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: {
         ? selectedSurfaceClassName
         : hasUnsentDraft
           ? draftSurfaceClassName
-          : topStatus?.icon === "done"
-            ? doneSurfaceClassName
-            : topStatus?.icon === "input" || topStatus?.icon === "approval"
-              ? needsYouSurfaceClassName
-              : restSurfaceClassName,
+          : restSurfaceClassName,
     // Background work fades as a whole row, status label included, so it
     // takes less attention than rows that need a human (input, approval).
     shouldRecede &&
@@ -1686,7 +1709,7 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: {
                 aria-busy={isRegeneratingTitle || undefined}
                 className={cn(
                   rowSurfaceClassName,
-                  "flex h-[4.5rem] flex-col items-center justify-center gap-1.5 px-2",
+                  "flex h-14 flex-col items-center justify-center gap-1 px-2",
                   props.isActive
                     ? "ring-2 ring-info/45 ring-inset"
                     : !isSelected &&
@@ -1702,16 +1725,10 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: {
             }
           >
             {accessibleTitle}
-            {statusIcon ? (
-              <span className={cn("absolute top-1.5 right-1.5 inline-flex", topStatus?.className)}>
-                {statusIcon}
-              </span>
-            ) : null}
-            <span className="absolute top-1.5 left-1.5 inline-flex">{draftIndicator}</span>
             {props.project ? (
-              <ProjectFavicon project={props.project} className="size-4 shrink-0" />
+              <ProjectFavicon project={props.project} className="size-3.5 shrink-0" />
             ) : (
-              <PinIcon aria-hidden className="size-4 shrink-0 text-muted-foreground" />
+              <PinIcon aria-hidden className="size-3.5 shrink-0 text-muted-foreground" />
             )}
             {isRenaming ? (
               <div className="flex w-full min-w-0">{title}</div>
@@ -1719,13 +1736,21 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: {
               <span
                 aria-hidden
                 className={cn(
-                  "line-clamp-2 w-full text-center text-xs leading-tight font-medium break-words",
+                  "w-full truncate text-center text-xs font-semibold",
                   isRegeneratingTitle && "opacity-55",
                 )}
               >
                 {thread.title}
               </span>
             )}
+            {draftIndicator ? (
+              <span className="absolute top-1.5 left-1.5 inline-flex">{draftIndicator}</span>
+            ) : null}
+            {statusIcon ? (
+              <span className={cn("absolute top-1.5 right-1.5 inline-flex", topStatus?.className)}>
+                {statusIcon}
+              </span>
+            ) : null}
             {props.jumpLabel ? <JumpHintBadge label={props.jumpLabel} /> : null}
           </TooltipTrigger>
           {detailsTooltip}
@@ -1973,35 +1998,8 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: {
                           <TooltipPopup side="top">Dismiss Woke notification</TooltipPopup>
                         </Tooltip>
                       ) : (
-                        <span
-                          className={cn(
-                            "inline-flex items-center gap-1 font-medium",
-                            topStatus.className,
-                          )}
-                        >
-                          {topStatus.icon === "working" ? (
-                            <CircleDashedIcon aria-hidden className="size-4 shrink-0" />
-                          ) : topStatus.icon === "input" ? (
-                            <MessageCircleQuestionIcon aria-hidden className="size-4 shrink-0" />
-                          ) : topStatus.icon === "approval" ? (
-                            <ShieldQuestionIcon aria-hidden className="size-4 shrink-0" />
-                          ) : topStatus.icon === "failed" ? (
-                            <CircleAlertIcon aria-hidden className="size-4 shrink-0" />
-                          ) : topStatus.icon === "monitoring" ? (
-                            <EyeIcon aria-hidden className="size-4 shrink-0" />
-                          ) : topStatus.icon === "done" ? (
-                            <CircleCheckIcon aria-hidden className="size-4 shrink-0" />
-                          ) : null}
-                          {/* The label alone is the live region: a role="status"
-                            wrapper around the ticking duration would make
-                            screen readers announce every second. */}
-                          <span role="status">{topStatus.label}</span>
-                          {status === "working" ? (
-                            <span aria-hidden>
-                              <WorkingDuration startedAt={resolveWorkingStartedAt(thread)} />
-                            </span>
-                          ) : null}
-                        </span>
+                        // Status reads on the second line; this slot keeps time.
+                        threadTimeLabel(thread)
                       )
                     ) : (
                       threadTimeLabel(thread)
@@ -2072,9 +2070,28 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: {
                 Regenerating title
               </span>
             ) : null}
-            {/* Metadata stays gray at rest; color is reserved for status. */}
+            {/* Why the thread is here, in its status color, then the project.
+                Everything else stays gray; color is reserved for status. */}
             <div className="flex h-4 min-w-0 items-center gap-1.5 pl-6 text-xs text-muted-foreground/70">
-              <span className="min-w-0 flex-1 truncate">{props.projectDisplayName ?? ""}</span>
+              <span className="min-w-0 flex-1 truncate">
+                {topStatus && !isWokeStatus ? (
+                  <span className={cn("font-medium", topStatus.className)}>
+                    {topStatus.icon === "approval"
+                      ? "Asks for approval"
+                      : topStatus.icon === "input"
+                        ? "Needs your input"
+                        : topStatus.label}
+                    {status === "working" ? (
+                      <>
+                        {" · "}
+                        <WorkingDuration startedAt={resolveWorkingStartedAt(thread)} />
+                      </>
+                    ) : null}
+                    {props.projectDisplayName ? " · " : null}
+                  </span>
+                ) : null}
+                {props.projectDisplayName ?? ""}
+              </span>
               {terminalStatusIcon}
               {prBadge ? (
                 <span className="inline-flex shrink-0 opacity-60 grayscale">{prBadge}</span>
@@ -2655,8 +2672,10 @@ export default function Sidebar() {
     const working: EnvironmentThreadShell[] = [];
     // Working beta: only inbox threads fold away. Pins stay where the user
     // put them, and snoozed or settled threads keep their shelves.
+    // Working threads always get their own group, between "Needs you" and
+    // "Open", so running agents never mix with work waiting on you.
     const inbox = (thread: EnvironmentThreadShell) =>
-      workingShelfEnabled && isSidebarThreadWorking(thread) ? working : active;
+      isSidebarThreadWorking(thread) ? working : active;
     const snoozed: EnvironmentThreadShell[] = [];
     const settled: EnvironmentThreadShell[] = [];
     const draggable = new Set<string>();
@@ -3521,6 +3540,40 @@ export default function Sidebar() {
     },
     [sectionByThreadKey],
   );
+  // A thread needs you when its turn finished unread, it is waiting on an
+  // approval or input, or it failed. Same rules the rows use for their fill.
+  const lastVisitedAtByKey = useUiStateStore((state) => state.threadLastVisitedAtById);
+  const [collapsedGroups, setCollapsedGroups] = useState<ReadonlySet<string>>(() => {
+    try {
+      const raw = window.localStorage.getItem(COLLAPSED_GROUPS_STORAGE_KEY);
+      return new Set(raw ? (JSON.parse(raw) as string[]) : []);
+    } catch {
+      return new Set();
+    }
+  });
+  const toggleGroup = useCallback((group: string) => {
+    setCollapsedGroups((current) => {
+      const next = new Set(current);
+      if (next.has(group)) next.delete(group);
+      else next.add(group);
+      window.localStorage.setItem(COLLAPSED_GROUPS_STORAGE_KEY, JSON.stringify([...next]));
+      return next;
+    });
+  }, []);
+  const threadNeedsYou = useCallback(
+    (thread: EnvironmentThreadShell) => {
+      const status = resolveSidebarThreadStatus(thread);
+      if (status === "approval" || status === "input" || status === "failed") {
+        return true;
+      }
+      const key = scopedThreadKey(scopeThreadRef(thread.environmentId, thread.id));
+      return hasUnseenCompletion({
+        ...thread,
+        lastVisitedAt: lastVisitedAtByKey[key],
+      });
+    },
+    [lastVisitedAtByKey],
+  );
   // Include every visible row in the measured order. Older servers disable
   // pickup on their rows without changing where those rows render.
   const sidebarListItems = useMemo((): readonly SidebarListItem[] => {
@@ -3546,13 +3599,17 @@ export default function Sidebar() {
     const pinnedRows = rowsOf(pinnedThreads, "pinned");
     items.push(...pinnedRows);
     items.push({ kind: "marker", marker: "pinned-divider" });
-    const activeRows = rowsOf(activeThreads, "active");
-    items.push({ kind: "marker", marker: "active-placeholder" });
-    items.push(...activeRows);
+    // Grouped by what the thread needs from you: needs you, then working,
+    // then everything else that is open.
+    const needsYou = activeThreads.filter(threadNeedsYou);
+    const open = activeThreads.filter((thread) => !threadNeedsYou(thread));
+    items.push(...rowsOf(needsYou, "active"));
     if (workingThreads.length > 0) {
       items.push({ kind: "marker", marker: "working-header" });
-      items.push(...rowsOf(visibleWorkingThreads, "working"));
+      items.push(...rowsOf(workingThreads, "working"));
     }
+    items.push({ kind: "marker", marker: "active-placeholder" });
+    items.push(...rowsOf(open, "active"));
     if (snoozedThreads.length > 0) {
       items.push({ kind: "marker", marker: "snoozed-header" });
       items.push(...rowsOf(visibleSnoozedThreads, "snoozed"));
@@ -3569,8 +3626,8 @@ export default function Sidebar() {
     settledThreads.length,
     snoozedThreads.length,
     visibleSnoozedThreads,
-    visibleWorkingThreads,
-    workingThreads.length,
+    threadNeedsYou,
+    workingThreads,
   ]);
   useEffect(() => {
     if (
@@ -4988,7 +5045,10 @@ export default function Sidebar() {
                           <SortableThreadRow
                             key={threadKey}
                             id={threadKey}
+                            // Drag is off: groups are ordered by status, so
+                            // pin, settle, and snooze use buttons and menus.
                             disabled={
+                              true ||
                               renamingThreadKey === threadKey ||
                               section === "working" ||
                               section === "pinned" ||
@@ -5013,17 +5073,45 @@ export default function Sidebar() {
                       ];
                       // Pinned threads render as a grid of tiles in one list item.
                       let pinnedTiles: ReactNode[] | null = null;
+                      const needsYouCount = activeThreads.filter(threadNeedsYou).length;
+                      const openCount = activeThreads.length - needsYouCount;
+                      let needsYouLabelShown = false;
                       for (const item of sidebarListItems) {
+                        if (
+                          item.kind === "thread" &&
+                          item.section === "active" &&
+                          !needsYouLabelShown &&
+                          threadNeedsYou(threadByKey.get(item.key)!)
+                        ) {
+                          needsYouLabelShown = true;
+                          items.push(
+                            <SidebarGroupLabel
+                              key="needs-you-label"
+                              label="Needs you"
+                              count={needsYouCount}
+                              expanded={!collapsedGroups.has("needs-you")}
+                              onToggle={() => toggleGroup("needs-you")}
+                            />,
+                          );
+                        }
+                        if (item.kind === "thread") {
+                          const group =
+                            item.section === "active"
+                              ? threadNeedsYou(threadByKey.get(item.key)!)
+                                ? "needs-you"
+                                : "open"
+                              : item.section === "working"
+                                ? "working"
+                                : null;
+                          if (group !== null && collapsedGroups.has(group)) continue;
+                        }
                         if (item.kind === "thread" && item.section === "pinned") {
                           const tile = renderThreadRow(threadByKey.get(item.key)!, item.section);
                           if (pinnedTiles === null) {
                             pinnedTiles = [tile];
                             items.push(
                               <li key="pinned-grid" className="list-none pb-1.5">
-                                <ul
-                                  role="presentation"
-                                  className="grid grid-cols-[repeat(auto-fill,minmax(5.5rem,1fr))] gap-1.5"
-                                >
+                                <ul role="presentation" className="grid grid-cols-2 gap-1.5">
                                   {pinnedTiles}
                                 </ul>
                               </li>,
@@ -5039,120 +5127,56 @@ export default function Sidebar() {
                         }
                         switch (item.marker) {
                           case "pinned-header":
-                            items.push(
-                              <SidebarDragBoundary
-                                key="pinned-header"
-                                marker="pinned-header"
-                                label="Pinned"
-                                visible={from !== null}
-                                isDropTarget={dragTargetSection === "pinned"}
-                              />,
-                            );
                             break;
                           case "pinned-divider":
-                            items.push(
-                              <SidebarDragBoundary
-                                key="pinned-divider"
-                                marker="pinned-divider"
-                                label="Active"
-                                visible={from !== null}
-                                isDropTarget={dragTargetSection === "active"}
-                              />,
-                            );
                             break;
                           case "active-placeholder":
-                            items.push(
-                              <SidebarSectionPlaceholder
-                                key="active-placeholder"
-                                marker="active-placeholder"
-                                label="Active"
-                                showHint={
-                                  from !== null &&
-                                  (activeThreads.length === 0 ||
-                                    (from === "active" &&
-                                      activeThreads.length === 1 &&
-                                      dragTargetSection !== null &&
-                                      dragTargetSection !== "active"))
-                                }
-                                isDropTarget={dragTargetSection === "active"}
-                              />,
-                            );
+                            if (openCount > 0) {
+                              items.push(
+                                <SidebarGroupLabel
+                                  key="open-label"
+                                  label="Open"
+                                  count={openCount}
+                                  expanded={!collapsedGroups.has("open")}
+                                  onToggle={() => toggleGroup("open")}
+                                />,
+                              );
+                            }
                             break;
                           case "working-header":
                             items.push(
-                              <SidebarSectionHeader
-                                key="working-shelf-header"
-                                marker="working-header"
-                                className="mt-auto"
-                                label={
-                                  workingShelfExpanded
-                                    ? "Working"
-                                    : `Working (${workingThreads.length})`
-                                }
-                                toggle={{
-                                  expanded: workingShelfExpanded,
-                                  onToggle: toggleWorkingShelf,
-                                }}
+                              <SidebarGroupLabel
+                                key="working-label"
+                                label="Working"
+                                count={workingThreads.length}
+                                expanded={!collapsedGroups.has("working")}
+                                onToggle={() => toggleGroup("working")}
                               />,
                             );
                             break;
                           case "snoozed-header":
                             items.push(
-                              <SidebarSectionHeader
-                                key="snoozed-shelf-header"
-                                marker="snoozed-header"
-                                className={cn(workingThreads.length === 0 && "mt-auto")}
-                                label={
-                                  snoozedShelfExpanded
-                                    ? "Snoozed"
-                                    : `Snoozed (${snoozedThreads.length})`
-                                }
-                                toggle={{
-                                  expanded: snoozedShelfExpanded,
-                                  onToggle: toggleSnoozedShelf,
-                                }}
+                              <SidebarGroupLabel
+                                key="snoozed-header"
+                                label="Snoozed"
+                                count={snoozedThreads.length}
+                                expanded={snoozedShelfExpanded}
+                                onToggle={toggleSnoozedShelf}
                               />,
                             );
                             break;
                           case "settled-header":
                             items.push(
-                              <SidebarSectionHeader
-                                key="settled-shelf-header"
-                                marker="settled-header"
-                                className={cn(
-                                  workingThreads.length + snoozedThreads.length === 0 && "mt-auto",
-                                )}
-                                label={
-                                  settledShelfExpanded
-                                    ? "Settled"
-                                    : `Settled (${settledThreads.length})`
-                                }
-                                dragging={from !== null}
-                                isDropTarget={dragTargetSection === "settled"}
-                                toggle={{
-                                  expanded: settledShelfExpanded,
-                                  onToggle: toggleSettledShelf,
-                                }}
+                              <SidebarGroupLabel
+                                key="settled-header"
+                                label="Settled"
+                                count={settledThreads.length}
+                                expanded={settledShelfExpanded}
+                                onToggle={toggleSettledShelf}
                               />,
                             );
                             break;
                           case "settled-placeholder":
-                            items.push(
-                              <SidebarSectionPlaceholder
-                                key="settled-placeholder"
-                                marker="settled-placeholder"
-                                label="Settled"
-                                showHint={
-                                  from !== null &&
-                                  (renderedSettledThreads.length === 0 ||
-                                    (from === "settled" &&
-                                      renderedSettledThreads.length === 1 &&
-                                      dragTargetSection !== null &&
-                                      dragTargetSection !== "settled"))
-                                }
-                                isDropTarget={dragTargetSection === "settled"}
-                              />,
-                            );
                             break;
                         }
                       }

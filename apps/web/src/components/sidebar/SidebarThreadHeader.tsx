@@ -80,7 +80,7 @@ export function SidebarThreadHeader({
   return (
     // One filled bar, like Arc's address bar: search and the header actions
     // share the same soft surface as the pinned tiles.
-    <div className="flex h-10 items-center gap-1 rounded-xl bg-black/[0.045] pr-1 dark:bg-white/[0.06]">
+    <div className="flex h-10 items-center gap-1 rounded-xl bg-chip pr-1">
       <div
         ref={searchFieldRef}
         className="flex h-full min-w-0 flex-1 items-center gap-2 px-3 text-sm font-medium text-sidebar-muted-foreground"

@@ -256,7 +256,9 @@ html[data-mobile-composer-route-transition="true"]::view-transition-old(t3-mobil
   --color-sidebar: var(--sidebar);
   /* Flat pastel shell behind the inset sidebar layout: the sidebar color with
      a light wash of the info hue, so it follows every theme and dark mode. */
-  --color-sidebar-shell: color-mix(in oklab, var(--sidebar) 90%, var(--info));
+  --color-sidebar-shell: var(--pal-shell, var(--sidebar));
+  /* Soft filled surface shared by the search bar and pinned tiles. */
+  --color-chip: var(--pal-chip, color-mix(in oklab, var(--foreground) 6%, transparent));
   --color-sidebar-foreground: var(--contrast-sidebar-foreground);
   --color-sidebar-muted-foreground: var(--contrast-sidebar-muted-foreground);
   --color-sidebar-control-surface: var(--sidebar-control-surface);
@@ -2237,4 +2239,248 @@ code {
 
 .composer-tiptap li[data-checked] > div > p {
   margin: 0;
+}
+
+/* Peaceful pastel palettes (my-tweaks). Each one sets the sidebar shell,
+   the soft chip surface, the accent used for primary actions, and the status
+   hues, so the whole app recolors as one system. Picked from the sidebar
+   footer; stored in localStorage and applied as <html data-palette>. The
+   :not() marker matches the custom-theme rule's specificity so palettes win. */
+html[data-palette="paper"]:not([data-palette=""]) {
+  --pal-shell: #efe9df;
+  --pal-chip: #e2dacb;
+  --primary: #34302b;
+  --primary-foreground: #ffffff;
+  --message-action: #34302b;
+  --message-action-foreground: #ffffff;
+  --ring: #34302b;
+  --success: #5f8a58;
+  --success-foreground: #5f8a58;
+  --warning: #a07a26;
+  --warning-foreground: #a07a26;
+  --error: #b0574c;
+  --error-foreground: #b0574c;
+  --info: #7d6bb3;
+  --info-foreground: #7d6bb3;
+}
+html.dark[data-palette="paper"]:not([data-palette=""]) {
+  --pal-shell: #1c1b19;
+  --pal-chip: #2a2825;
+  --primary: #ece6dc;
+  --primary-foreground: #1c1b19;
+  --message-action: #ece6dc;
+  --message-action-foreground: #1c1b19;
+  --ring: #ece6dc;
+  --success: #9cc493;
+  --success-foreground: #9cc493;
+  --warning: #e2c27a;
+  --warning-foreground: #e2c27a;
+  --error: #eb9d90;
+  --error-foreground: #eb9d90;
+  --info: #b3a5e6;
+  --info-foreground: #b3a5e6;
+}
+html[data-palette="lotus"]:not([data-palette=""]) {
+  --pal-shell: #f4e3e9;
+  --pal-chip: #e9d0da;
+  --primary: #14625f;
+  --primary-foreground: #ffffff;
+  --message-action: #14625f;
+  --message-action-foreground: #ffffff;
+  --ring: #14625f;
+  --success: #2f7d72;
+  --success-foreground: #2f7d72;
+  --warning: #a5702a;
+  --warning-foreground: #a5702a;
+  --error: #b0476a;
+  --error-foreground: #b0476a;
+  --info: #8f5b7f;
+  --info-foreground: #8f5b7f;
+}
+html.dark[data-palette="lotus"]:not([data-palette=""]) {
+  --pal-shell: #1f181c;
+  --pal-chip: #2e2329;
+  --primary: #7fc7bf;
+  --primary-foreground: #1f181c;
+  --message-action: #7fc7bf;
+  --message-action-foreground: #1f181c;
+  --ring: #7fc7bf;
+  --success: #86cdbf;
+  --success-foreground: #86cdbf;
+  --warning: #e3b77a;
+  --warning-foreground: #e3b77a;
+  --error: #ee9bb4;
+  --error-foreground: #ee9bb4;
+  --info: #cf9fc3;
+  --info-foreground: #cf9fc3;
+}
+html[data-palette="storm"]:not([data-palette=""]) {
+  --pal-shell: #e2ebe9;
+  --pal-chip: #cfdcd9;
+  --primary: #3d6a65;
+  --primary-foreground: #ffffff;
+  --message-action: #3d6a65;
+  --message-action-foreground: #ffffff;
+  --ring: #3d6a65;
+  --success: #3f7a66;
+  --success-foreground: #3f7a66;
+  --warning: #8a7530;
+  --warning-foreground: #8a7530;
+  --error: #a4534a;
+  --error-foreground: #a4534a;
+  --info: #4f7c88;
+  --info-foreground: #4f7c88;
+}
+html.dark[data-palette="storm"]:not([data-palette=""]) {
+  --pal-shell: #141b1c;
+  --pal-chip: #212a2b;
+  --primary: #8fbcb4;
+  --primary-foreground: #141b1c;
+  --message-action: #8fbcb4;
+  --message-action-foreground: #141b1c;
+  --ring: #8fbcb4;
+  --success: #94c9b1;
+  --success-foreground: #94c9b1;
+  --warning: #d9c27e;
+  --warning-foreground: #d9c27e;
+  --error: #e8a097;
+  --error-foreground: #e8a097;
+  --info: #93c1cc;
+  --info-foreground: #93c1cc;
+}
+html[data-palette="crocus"]:not([data-palette=""]) {
+  --pal-shell: #e8e5f5;
+  --pal-chip: #d8d2ee;
+  --primary: #56499b;
+  --primary-foreground: #ffffff;
+  --message-action: #56499b;
+  --message-action-foreground: #ffffff;
+  --ring: #56499b;
+  --success: #4a7d5a;
+  --success-foreground: #4a7d5a;
+  --warning: #9a7426;
+  --warning-foreground: #9a7426;
+  --error: #a8506a;
+  --error-foreground: #a8506a;
+  --info: #6a62b0;
+  --info-foreground: #6a62b0;
+}
+html.dark[data-palette="crocus"]:not([data-palette=""]) {
+  --pal-shell: #18172a;
+  --pal-chip: #25223a;
+  --primary: #b3a9ec;
+  --primary-foreground: #18172a;
+  --message-action: #b3a9ec;
+  --message-action-foreground: #18172a;
+  --ring: #b3a9ec;
+  --success: #9ccaa6;
+  --success-foreground: #9ccaa6;
+  --warning: #e0c07c;
+  --warning-foreground: #e0c07c;
+  --error: #eaa0b4;
+  --error-foreground: #eaa0b4;
+  --info: #b8b0f0;
+  --info-foreground: #b8b0f0;
+}
+html[data-palette="peony"]:not([data-palette=""]) {
+  --pal-shell: #f7e7e2;
+  --pal-chip: #eed4cd;
+  --primary: #6c7254;
+  --primary-foreground: #ffffff;
+  --message-action: #6c7254;
+  --message-action-foreground: #ffffff;
+  --ring: #6c7254;
+  --success: #5f7040;
+  --success-foreground: #5f7040;
+  --warning: #a66a2c;
+  --warning-foreground: #a66a2c;
+  --error: #b5534e;
+  --error-foreground: #b5534e;
+  --info: #b06f7a;
+  --info-foreground: #b06f7a;
+}
+html.dark[data-palette="peony"]:not([data-palette=""]) {
+  --pal-shell: #1f1918;
+  --pal-chip: #2e2422;
+  --primary: #c9cdb0;
+  --primary-foreground: #1f1918;
+  --message-action: #c9cdb0;
+  --message-action-foreground: #1f1918;
+  --ring: #c9cdb0;
+  --success: #b7c79a;
+  --success-foreground: #b7c79a;
+  --warning: #e8bd85;
+  --warning-foreground: #e8bd85;
+  --error: #f0a39c;
+  --error-foreground: #f0a39c;
+  --info: #e6a9b3;
+  --info-foreground: #e6a9b3;
+}
+html[data-palette="succulent"]:not([data-palette=""]) {
+  --pal-shell: #dfeae2;
+  --pal-chip: #cddfd2;
+  --primary: #1f4d3f;
+  --primary-foreground: #ffffff;
+  --message-action: #1f4d3f;
+  --message-action-foreground: #ffffff;
+  --ring: #1f4d3f;
+  --success: #2f6f4d;
+  --success-foreground: #2f6f4d;
+  --warning: #8f7428;
+  --warning-foreground: #8f7428;
+  --error: #a5524a;
+  --error-foreground: #a5524a;
+  --info: #3f7079;
+  --info-foreground: #3f7079;
+}
+html.dark[data-palette="succulent"]:not([data-palette=""]) {
+  --pal-shell: #121a16;
+  --pal-chip: #1e2923;
+  --primary: #8ccab0;
+  --primary-foreground: #121a16;
+  --message-action: #8ccab0;
+  --message-action-foreground: #121a16;
+  --ring: #8ccab0;
+  --success: #93cfa9;
+  --success-foreground: #93cfa9;
+  --warning: #dbc27c;
+  --warning-foreground: #dbc27c;
+  --error: #e8a097;
+  --error-foreground: #e8a097;
+  --info: #93c4cc;
+  --info-foreground: #93c4cc;
+}
+html[data-palette="meadow"]:not([data-palette=""]) {
+  --pal-shell: #f8eed0;
+  --pal-chip: #eedfb7;
+  --primary: #8a5571;
+  --primary-foreground: #ffffff;
+  --message-action: #8a5571;
+  --message-action-foreground: #ffffff;
+  --ring: #8a5571;
+  --success: #5c7034;
+  --success-foreground: #5c7034;
+  --warning: #a3711a;
+  --warning-foreground: #a3711a;
+  --error: #b0524f;
+  --error-foreground: #b0524f;
+  --info: #a86a8a;
+  --info-foreground: #a86a8a;
+}
+html.dark[data-palette="meadow"]:not([data-palette=""]) {
+  --pal-shell: #1e1a12;
+  --pal-chip: #2c261a;
+  --primary: #e1b1c9;
+  --primary-foreground: #1e1a12;
+  --message-action: #e1b1c9;
+  --message-action-foreground: #1e1a12;
+  --ring: #e1b1c9;
+  --success: #b5cb8e;
+  --success-foreground: #b5cb8e;
+  --warning: #ecc77a;
+  --warning-foreground: #ecc77a;
+  --error: #eda29e;
+  --error-foreground: #eda29e;
+  --info: #e2a8c6;
+  --info-foreground: #e2a8c6;
 }

@@ -38,6 +38,9 @@ import { SidebarChromeHeader } from "./sidebar/SidebarChrome";
 import { MainAppLocationTracker } from "./sidebar/mainAppLocation";
 import { useSidebarStageBackdropVariant } from "./SidebarStageBackdrop";
 import { useProjects } from "../state/entities";
+import { applyStoredPalette } from "../palette";
+
+applyStoredPalette();
 import {
   resolveInitialThreadSidebarWidth,
   resolveThreadSidebarMaximumWidth,
