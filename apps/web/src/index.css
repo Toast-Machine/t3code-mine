@@ -2678,3 +2678,11 @@ html[data-palette="deepteal"]:not([data-palette=""]) [data-sidebar-control] {
   --info: #a9dbe0;
   --info-foreground: #a9dbe0;
 }
+
+/* Hover and highlight wash on the light (or dark) content panel: a touch
+   stronger than the stock accent so hovered controls read on white. Deep
+   palettes still override it inside the sidebar. */
+html[data-palette]:not([data-palette=""]) {
+  --accent: color-mix(in oklab, var(--foreground) 8%, var(--background));
+  --toolbar-control-hover: color-mix(in oklab, var(--foreground) 8%, var(--background));
+}
