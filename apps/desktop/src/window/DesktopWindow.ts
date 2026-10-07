@@ -251,6 +251,8 @@ export function concealPendingQuitWindow(
   window.setOpacity(0);
 }
 
+const MACOS_INSET_LAYOUT_PADDING = 8;
+
 function getWindowTitleBarOptions(
   shouldUseDarkColors: boolean,
   platform: NodeJS.Platform,
@@ -258,9 +260,14 @@ function getWindowTitleBarOptions(
   if (platform === "darwin") {
     return {
       titleBarStyle: "hiddenInset",
+      // Shifted by the inset layout's 8px padding so the window buttons line
+      // up with the sidebar header and the panel's titlebar controls.
       trafficLightPosition: {
-        x: 16,
-        y: MACOS_WORKSPACE_TOPBAR_HEIGHT / 2 - MACOS_WINDOW_BUTTON_RADIUS,
+        x: 16 + MACOS_INSET_LAYOUT_PADDING,
+        y:
+          MACOS_WORKSPACE_TOPBAR_HEIGHT / 2 -
+          MACOS_WINDOW_BUTTON_RADIUS +
+          MACOS_INSET_LAYOUT_PADDING,
       },
     };
   }
