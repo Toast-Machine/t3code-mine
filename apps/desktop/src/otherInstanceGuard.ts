@@ -24,9 +24,16 @@ export function quitIfAnotherT3CodeIsRunning(): void {
   );
   if (other === undefined) return;
   const otherName = other.slice(other.lastIndexOf("/") + 1);
-  Electron.dialog.showErrorBox(
-    "T3 Code is already open",
-    `${otherName} is running and uses the same chats and settings. Quit it first, then open this app again.`,
-  );
+  // Electron cannot show a dialog this early on macOS, so ask the system to
+  // show a plain alert and wait for the user to dismiss it.
+  const message = `${otherName} is running and uses the same chats and settings. Quit it first, then open this app again.`;
+  try {
+    NodeChildProcess.execFileSync("/usr/bin/osascript", [
+      "-e",
+      `display alert "T3 Code is already open" message ${JSON.stringify(message)} as warning`,
+    ]);
+  } catch {
+    // The alert is best effort; quitting is what protects the data.
+  }
   Electron.app.exit(0);
 }
