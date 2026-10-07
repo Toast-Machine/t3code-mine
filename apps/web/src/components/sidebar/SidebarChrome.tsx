@@ -33,8 +33,10 @@ import { PullRequestGlyph } from "~/components/pullRequest/pullRequestIcons";
 
 export const SidebarChromeHeader = memo(function SidebarChromeHeader({
   isElectron,
+  title,
 }: {
   isElectron: boolean;
+  title: string;
 }) {
   const stageLabel = useEnvironmentStageLabel();
   const environmentIdentificationMode = useEnvironmentIdentificationMode();
@@ -51,7 +53,7 @@ export const SidebarChromeHeader = memo(function SidebarChromeHeader({
     // The titlebar row, not a padded SidebarHeader: it aligns to the window controls.
     <div
       className={cn(
-        "@container/sidebar-header relative flex h-[var(--workspace-topbar-height)] shrink-0 flex-row items-center gap-2 px-3 md:px-0",
+        "@container/sidebar-header relative flex h-[var(--workspace-topbar-height)] shrink-0 flex-row items-center gap-2 px-3 md:ps-4 md:pe-2",
         isElectron && "drag-region",
       )}
     >
@@ -61,6 +63,10 @@ export const SidebarChromeHeader = memo(function SidebarChromeHeader({
         variant={backdropVariant ? "media-navigation" : "ghost"}
         className="relative top-auto z-10 translate-y-0 md:hidden"
       />
+      {/* Every sidebar shares this header: its page title and a collapse button. */}
+      <h2 className="min-w-0 flex-1 truncate text-base font-semibold tracking-tight text-sidebar-foreground">
+        {title}
+      </h2>
       {pillLabel ? (
         <Badge
           className="relative z-10 ml-1 hidden @[15rem]/sidebar-header:inline-flex"
@@ -71,6 +77,10 @@ export const SidebarChromeHeader = memo(function SidebarChromeHeader({
           {pillLabel}
         </Badge>
       ) : null}
+      <SidebarTrigger
+        variant="ghost"
+        className="relative top-auto z-10 hidden translate-y-0 md:inline-flex"
+      />
     </div>
   );
 });

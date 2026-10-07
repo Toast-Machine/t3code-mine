@@ -2,6 +2,8 @@ import { ChartNoAxesColumnIcon, MessagesSquareIcon, SettingsIcon } from "lucide-
 import type { ReactNode } from "react";
 import { useLocation, useNavigate } from "@tanstack/react-router";
 
+import { useSidebar } from "../ui/sidebar";
+
 import { cn } from "../../lib/utils";
 import { useEnvironments } from "../../state/environments";
 import { PullRequestGlyph } from "../pullRequest/pullRequestIcons";
@@ -47,6 +49,7 @@ export function AppRail() {
   const navigateToMainApp = useNavigateToMainApp();
   const pathname = useLocation({ select: (location) => location.pathname });
   const { environments } = useEnvironments();
+  const { open, setOpen } = useSidebar();
   const pullRequestsSupported = environments.some(
     (environment) => environment.serverConfig?.environment.capabilities.pullRequests === true,
   );
@@ -62,12 +65,15 @@ export function AppRail() {
       aria-label="App"
       data-app-sidebar=""
       data-app-rail=""
-      className="relative z-20 hidden h-dvh w-(--app-rail-width) shrink-0 flex-col items-center gap-1.5 pt-16 pb-3 md:flex"
+      className="drag-region relative z-20 hidden h-dvh w-(--app-rail-width) shrink-0 flex-col items-center gap-1.5 bg-sidebar-shell ps-2 pt-(--app-rail-top) pb-3 md:flex [&_button]:[-webkit-app-region:no-drag]"
     >
       <RailButton
         label="Threads"
         active={page === "threads"}
-        onClick={() => void navigateToMainApp()}
+        onClick={() => {
+          if (page === "threads" && !open) setOpen(true);
+          else void navigateToMainApp();
+        }}
       >
         <MessagesSquareIcon />
       </RailButton>

@@ -59,8 +59,6 @@ import {
 } from "./ui/sidebar";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "./ui/tooltip";
 
-const MACOS_TRAFFIC_LIGHTS_LEFT_INSET = "var(--desktop-window-controls-inset, 90px)";
-
 function subscribeToViewportWidth(onChange: () => void): () => void {
   window.addEventListener("resize", onChange);
   return () => window.removeEventListener("resize", onChange);
@@ -133,8 +131,13 @@ function SidebarControl() {
     // The right-side layout controls carry mr-px (border compensation inside
     // the panel), so the trigger mirrors it: both clusters sit one extra pixel
     // off their edge and the titlebar reads symmetric.
+    // With the app rail, the list collapses from its own header; this button
+    // only appears in the panel once the list is closed, to reopen it.
     <div
-      className="pointer-events-none fixed left-[calc(var(--workspace-controls-left)+0.5rem)] top-[calc(var(--workspace-controls-top)+0.5rem)] z-50 ml-px flex h-[var(--workspace-topbar-height)] items-center"
+      className={cn(
+        "pointer-events-none fixed left-[calc(var(--workspace-controls-left)+0.5rem)] top-[calc(var(--workspace-controls-top)+0.5rem)] z-50 ml-px flex h-[var(--workspace-topbar-height)] items-center",
+        isSidebarVisible && "hidden",
+      )}
       data-sidebar-control=""
     >
       <Tooltip>
@@ -256,11 +259,20 @@ export function AppSidebarLayout({ children }: { children: ReactNode }) {
   const sidebarProviderStyle = {
     // Wide enough on macOS to hold the window buttons above the rail icons.
     "--app-rail-width": isMacosDesktop && !isWindowFullscreen ? "5.5rem" : "4rem",
+    // First rail icon: centered on the panel's title row, or on macOS (where the
+    // window buttons own that row) aligned with the search row below it.
+    "--app-rail-top":
+      isMacosDesktop && !isWindowFullscreen
+        ? "calc(var(--workspace-topbar-height) + 1rem)"
+        : "calc(0.5rem + (var(--workspace-topbar-height) - 2.5rem) / 2)",
     "--sidebar-width": hidesThreadList ? "0px" : `${sidebarWidth}px`,
     "--panel-animation-duration": `${panelAnimationDurationMs}ms`,
-    ...(isMacosDesktop && !isWindowFullscreen
-      ? { "--workspace-controls-left": MACOS_TRAFFIC_LIGHTS_LEFT_INSET }
-      : {}),
+    // Panel titlebar controls start just inside the panel, right of the rail.
+    "--workspace-controls-left": "calc(var(--app-rail-width) + 0.75rem)",
+    // Collapsed-list title inset is padding inside the panel, so it is measured
+    // from the panel edge (the reopen button sits 0.75rem in), not the window.
+    "--workspace-titlebar-content-left":
+      "calc(0.75rem + var(--workspace-titlebar-control-size) + var(--workspace-titlebar-control-gap))",
   } as CSSProperties;
 
   useEffect(() => {
@@ -338,7 +350,7 @@ export function AppSidebarLayout({ children }: { children: ReactNode }) {
         >
           {isOnSettings ? (
             <>
-              <SidebarChromeHeader isElectron={isElectron} />
+              <SidebarChromeHeader isElectron={isElectron} title="Settings" />
               <SettingsSidebarNav pathname={pathname} />
             </>
           ) : legacySidebarEnabled ? (
@@ -349,7 +361,12 @@ export function AppSidebarLayout({ children }: { children: ReactNode }) {
           <SidebarRail onDoubleClick={resetSidebarWidth} />
         </Sidebar>
         {children}
-        {hidesThreadList ? null : <SidebarControl />}
+        {/* The rail replaces the floating titlebar toggle: each sidebar header
+            has its own collapse button, and Threads in the rail reopens it.
+            The control still mounts for its keyboard shortcut. */}
+        <div className={cn(hidesThreadList && "hidden")}>
+          <SidebarControl />
+        </div>
         <NavigationHistoryShortcuts />
         <MainAppLocationTracker />
       </SidebarProvider>
