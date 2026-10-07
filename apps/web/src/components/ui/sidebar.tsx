@@ -610,9 +610,9 @@ function SidebarContent({
         // Base UI's viewport out of the tab order lets its presentational role
         // flatten in WebKit instead of becoming a VoiceOver interaction group.
         viewportTabIndex={-1}
-        // The inset variant's rounded panel already frames the list, so its
-        // rows run to the edge instead of fading out.
-        className="h-auto min-h-0 flex-1 [&>[data-slot=scroll-area-viewport]]:[--fade-size:0.75rem] group-data-[variant=inset]:[&>[data-slot=scroll-area-viewport]]:mask-none"
+        // The inset variant's rounded panel frames the bottom, so rows run to
+        // that edge; the top keeps its fade under the fixed header.
+        className="h-auto min-h-0 flex-1 [&>[data-slot=scroll-area-viewport]]:[--fade-size:0.75rem] group-data-[variant=inset]:[&>[data-slot=scroll-area-viewport]]:mask-b-from-100%"
       >
         <div
           // Reordered rows must not pull the viewport to their new position.
