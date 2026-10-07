@@ -82,6 +82,8 @@ function normalizeContextMenuItems(source: readonly ContextMenuItem[]): ContextM
       disabled: sourceItem.disabled === true,
       ...(sourceItem.separatorBefore === true ? { separatorBefore: true } : {}),
       ...(typeof sourceItem.checked === "boolean" ? { checked: sourceItem.checked } : {}),
+      // Personal build: keep the icon keyword for the native menu's SF Symbol.
+      ...(typeof sourceItem.icon === "string" ? { icon: sourceItem.icon } : {}),
     };
 
     if (sourceItem.children) {
