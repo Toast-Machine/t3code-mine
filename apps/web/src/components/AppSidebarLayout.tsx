@@ -303,8 +303,9 @@ export function AppSidebarLayout({ children }: { children: ReactNode }) {
   });
   const sidebarProviderStyle = {
     // The rail owns the whole left gutter up to the panel, so its icons center
-    // by layout alone. Wider on macOS to hold the window buttons above them.
-    "--app-rail-width": isMacosDesktop && !isWindowFullscreen ? "6rem" : "4.5rem",
+    // by layout alone. On macOS the window buttons are its top item, centered in
+    // the same width (see macosWindowButtonPosition in the desktop app).
+    "--app-rail-width": "4.5rem",
     // First rail icon: centered on the page sidebar's title row, or on macOS
     // (where the window buttons own that row) aligned with the search row.
     "--app-rail-top":
@@ -376,13 +377,6 @@ export function AppSidebarLayout({ children }: { children: ReactNode }) {
           role="navigation"
           aria-label={pageSidebar?.label ?? "Sidebar"}
           absent={pageSidebar === null}
-          // The rail sits left of the sidebar, so header controls that clear
-          // the macOS window buttons need that much less inset here.
-          className={
-            isMacosDesktop && !isWindowFullscreen
-              ? "[--workspace-controls-left:max(0.75rem,calc(var(--desktop-window-controls-inset,90px)-var(--app-rail-width)))]"
-              : undefined
-          }
           resizable={{
             maxWidth: sidebarMaximumWidth,
             minWidth: THREAD_SIDEBAR_MIN_WIDTH,
