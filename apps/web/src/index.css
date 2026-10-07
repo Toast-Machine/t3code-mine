@@ -259,6 +259,9 @@ html[data-mobile-composer-route-transition="true"]::view-transition-old(t3-mobil
   --color-sidebar-shell: var(--pal-shell, var(--sidebar));
   /* Soft filled surface shared by the search bar and pinned tiles. */
   --color-chip: var(--pal-chip, color-mix(in oklab, var(--foreground) 6%, transparent));
+  --color-row-hover: var(--pal-row-hover);
+  --color-row-active: var(--pal-row-active);
+  --color-row-selected: var(--pal-row-selected);
   --color-sidebar-foreground: var(--contrast-sidebar-foreground);
   --color-sidebar-muted-foreground: var(--contrast-sidebar-muted-foreground);
   --color-sidebar-control-surface: var(--sidebar-control-surface);
@@ -2483,4 +2486,170 @@ html.dark[data-palette="meadow"]:not([data-palette=""]) {
   --error-foreground: #eda29e;
   --info: #e2a8c6;
   --info-foreground: #e2a8c6;
+}
+
+/* Row surfaces shared by every palette: hover wash, open row, selection. */
+:root {
+  --pal-row-hover: rgb(255 255 255 / 0.55);
+  --pal-row-active: #ffffff;
+  --pal-row-selected: rgb(255 255 255 / 0.6);
+}
+:root.dark {
+  --pal-row-hover: rgb(255 255 255 / 0.06);
+  --pal-row-active: rgb(255 255 255 / 0.12);
+  --pal-row-selected: rgb(255 255 255 / 0.08);
+}
+
+/* Deep palettes: a rich, dark sidebar with white text in light mode too. The
+   chat panel keeps the normal light (or dark) surface; only the sidebar and
+   its toggle flip to light-on-dark, including lighter status hues. */
+html[data-palette="blueberry"]:not([data-palette=""]) {
+  --pal-shell: #1e3150;
+  --pal-chip: rgb(255 255 255 / 0.1);
+  --pal-row-hover: rgb(255 255 255 / 0.07);
+  --pal-row-active: rgb(255 255 255 / 0.17);
+  --pal-row-selected: rgb(255 255 255 / 0.11);
+  --primary: #2f5c94;
+  --primary-foreground: #ffffff;
+  --message-action: #2f5c94;
+  --message-action-foreground: #ffffff;
+  --ring: #2f5c94;
+}
+html[data-palette="blueberry"]:not([data-palette=""]) [data-slot="sidebar"],
+html[data-palette="blueberry"]:not([data-palette=""]) [data-app-sidebar],
+html[data-palette="blueberry"]:not([data-palette=""]) [data-sidebar-control] {
+  --contrast-sidebar-foreground: #ffffff;
+  --contrast-sidebar-muted-foreground: rgb(255 255 255 / 0.62);
+  --sidebar-icon-color: rgb(255 255 255 / 0.62);
+  --foreground: #ffffff;
+  --muted-foreground: rgb(255 255 255 / 0.62);
+  --secondary-label: rgb(255 255 255 / 0.62);
+  --success: #9fd6b0;
+  --success-foreground: #9fd6b0;
+  --warning: #f2cf86;
+  --warning-foreground: #f2cf86;
+  --error: #f4a7a2;
+  --error-foreground: #f4a7a2;
+  --info: #b9c8f2;
+  --info-foreground: #b9c8f2;
+}
+html[data-palette="forest"]:not([data-palette=""]) {
+  --pal-shell: #173a2f;
+  --pal-chip: rgb(255 255 255 / 0.1);
+  --pal-row-hover: rgb(255 255 255 / 0.07);
+  --pal-row-active: rgb(255 255 255 / 0.17);
+  --pal-row-selected: rgb(255 255 255 / 0.11);
+  --primary: #235c49;
+  --primary-foreground: #ffffff;
+  --message-action: #235c49;
+  --message-action-foreground: #ffffff;
+  --ring: #235c49;
+}
+html[data-palette="forest"]:not([data-palette=""]) [data-slot="sidebar"],
+html[data-palette="forest"]:not([data-palette=""]) [data-app-sidebar],
+html[data-palette="forest"]:not([data-palette=""]) [data-sidebar-control] {
+  --contrast-sidebar-foreground: #ffffff;
+  --contrast-sidebar-muted-foreground: rgb(255 255 255 / 0.62);
+  --sidebar-icon-color: rgb(255 255 255 / 0.62);
+  --foreground: #ffffff;
+  --muted-foreground: rgb(255 255 255 / 0.62);
+  --secondary-label: rgb(255 255 255 / 0.62);
+  --success: #a8dcb8;
+  --success-foreground: #a8dcb8;
+  --warning: #ecd08c;
+  --warning-foreground: #ecd08c;
+  --error: #f2aaa2;
+  --error-foreground: #f2aaa2;
+  --info: #a9d3dc;
+  --info-foreground: #a9d3dc;
+}
+html[data-palette="rosewood"]:not([data-palette=""]) {
+  --pal-shell: #6a3450;
+  --pal-chip: rgb(255 255 255 / 0.1);
+  --pal-row-hover: rgb(255 255 255 / 0.07);
+  --pal-row-active: rgb(255 255 255 / 0.17);
+  --pal-row-selected: rgb(255 255 255 / 0.11);
+  --primary: #8c4467;
+  --primary-foreground: #ffffff;
+  --message-action: #8c4467;
+  --message-action-foreground: #ffffff;
+  --ring: #8c4467;
+}
+html[data-palette="rosewood"]:not([data-palette=""]) [data-slot="sidebar"],
+html[data-palette="rosewood"]:not([data-palette=""]) [data-app-sidebar],
+html[data-palette="rosewood"]:not([data-palette=""]) [data-sidebar-control] {
+  --contrast-sidebar-foreground: #ffffff;
+  --contrast-sidebar-muted-foreground: rgb(255 255 255 / 0.62);
+  --sidebar-icon-color: rgb(255 255 255 / 0.62);
+  --foreground: #ffffff;
+  --muted-foreground: rgb(255 255 255 / 0.62);
+  --secondary-label: rgb(255 255 255 / 0.62);
+  --success: #b9e0c2;
+  --success-foreground: #b9e0c2;
+  --warning: #f6d79a;
+  --warning-foreground: #f6d79a;
+  --error: #ffc1c6;
+  --error-foreground: #ffc1c6;
+  --info: #f0c4dd;
+  --info-foreground: #f0c4dd;
+}
+html[data-palette="plum"]:not([data-palette=""]) {
+  --pal-shell: #382356;
+  --pal-chip: rgb(255 255 255 / 0.1);
+  --pal-row-hover: rgb(255 255 255 / 0.07);
+  --pal-row-active: rgb(255 255 255 / 0.17);
+  --pal-row-selected: rgb(255 255 255 / 0.11);
+  --primary: #5b3d8c;
+  --primary-foreground: #ffffff;
+  --message-action: #5b3d8c;
+  --message-action-foreground: #ffffff;
+  --ring: #5b3d8c;
+}
+html[data-palette="plum"]:not([data-palette=""]) [data-slot="sidebar"],
+html[data-palette="plum"]:not([data-palette=""]) [data-app-sidebar],
+html[data-palette="plum"]:not([data-palette=""]) [data-sidebar-control] {
+  --contrast-sidebar-foreground: #ffffff;
+  --contrast-sidebar-muted-foreground: rgb(255 255 255 / 0.62);
+  --sidebar-icon-color: rgb(255 255 255 / 0.62);
+  --foreground: #ffffff;
+  --muted-foreground: rgb(255 255 255 / 0.62);
+  --secondary-label: rgb(255 255 255 / 0.62);
+  --success: #acdcb8;
+  --success-foreground: #acdcb8;
+  --warning: #f1d18e;
+  --warning-foreground: #f1d18e;
+  --error: #f6abb6;
+  --error-foreground: #f6abb6;
+  --info: #d4c4f6;
+  --info-foreground: #d4c4f6;
+}
+html[data-palette="deepteal"]:not([data-palette=""]) {
+  --pal-shell: #0f4746;
+  --pal-chip: rgb(255 255 255 / 0.1);
+  --pal-row-hover: rgb(255 255 255 / 0.07);
+  --pal-row-active: rgb(255 255 255 / 0.17);
+  --pal-row-selected: rgb(255 255 255 / 0.11);
+  --primary: #14625f;
+  --primary-foreground: #ffffff;
+  --message-action: #14625f;
+  --message-action-foreground: #ffffff;
+  --ring: #14625f;
+}
+html[data-palette="deepteal"]:not([data-palette=""]) [data-slot="sidebar"],
+html[data-palette="deepteal"]:not([data-palette=""]) [data-app-sidebar],
+html[data-palette="deepteal"]:not([data-palette=""]) [data-sidebar-control] {
+  --contrast-sidebar-foreground: #ffffff;
+  --contrast-sidebar-muted-foreground: rgb(255 255 255 / 0.62);
+  --sidebar-icon-color: rgb(255 255 255 / 0.62);
+  --foreground: #ffffff;
+  --muted-foreground: rgb(255 255 255 / 0.62);
+  --secondary-label: rgb(255 255 255 / 0.62);
+  --success: #a6e0cf;
+  --success-foreground: #a6e0cf;
+  --warning: #f0d08c;
+  --warning-foreground: #f0d08c;
+  --error: #f5abae;
+  --error-foreground: #f5abae;
+  --info: #a9dbe0;
+  --info-foreground: #a9dbe0;
 }

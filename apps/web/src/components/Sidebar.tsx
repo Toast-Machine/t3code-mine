@@ -568,9 +568,9 @@ function SortableThreadRow(props: {
 
 // Flat, Arc-like surfaces: list rows have no fill at rest, the open row is
 // solid, and only rows that need you get a pastel fill.
-const restSurfaceClassName = "bg-transparent hover:bg-white/55 dark:hover:bg-white/[0.06]";
-const activeSurfaceClassName = "bg-white dark:bg-white/[0.12]";
-const selectedSurfaceClassName = "bg-white/60 dark:bg-white/[0.08]";
+const restSurfaceClassName = "bg-transparent hover:bg-row-hover";
+const activeSurfaceClassName = "bg-row-active";
+const selectedSurfaceClassName = "bg-row-selected";
 // Pinned tiles are the one filled element at rest, like Arc's favorites.
 const tileRestSurfaceClassName = "bg-chip hover:bg-chip/70";
 // Unsent work shares one look: the new-thread draft rows and thread rows
@@ -1225,7 +1225,7 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: {
           icon: "working" as const,
           // No shimmer: a label that animates forever is noise in a sidebar
           // full of them (and repaints every vsync on high-refresh displays).
-          className: "text-sky-600 dark:text-sky-400",
+          className: "text-info",
         }
       : status === "monitoring"
         ? {
@@ -1233,7 +1233,7 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: {
             // (monitoring-pill D6), so it keeps the label at full strength.
             label: "Monitoring",
             icon: "monitoring" as const,
-            className: "text-foreground dark:text-white",
+            className: "text-info",
           }
         : status === "approval"
           ? {
@@ -1245,13 +1245,13 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: {
             ? {
                 label: "Input",
                 icon: "input" as const,
-                className: "text-indigo-600 dark:text-indigo-300",
+                className: "text-warning-foreground",
               }
             : status === "failed"
               ? {
                   label: "Failed",
                   icon: "failed" as const,
-                  className: "text-red-700 dark:text-red-300",
+                  className: "text-error",
                 }
               : isWoke
                 ? {
@@ -1263,7 +1263,7 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: {
                   ? {
                       label: "Done",
                       icon: "done" as const,
-                      className: "text-emerald-700 dark:text-emerald-300",
+                      className: "text-success",
                     }
                   : null;
   const isWokeStatus = topStatus?.icon === "woke";
@@ -1570,7 +1570,9 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: {
             // waiting on you step up in weight.
             cn(
               "truncate",
-              props.isActive || needsAttentionFill ? "text-foreground" : "text-foreground/85",
+              props.isActive || needsAttentionFill
+                ? "text-sidebar-foreground"
+                : "text-sidebar-foreground/90",
             )
           : cn(
               "truncate group-focus-within/sidebar-row:text-foreground group-hover/sidebar-row:text-foreground",
@@ -1711,7 +1713,7 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: {
                   rowSurfaceClassName,
                   "flex h-14 flex-col items-center justify-center gap-1 px-2",
                   props.isActive
-                    ? "ring-2 ring-info/45 ring-inset"
+                    ? "ring-2 ring-sidebar-foreground/25 ring-inset"
                     : !isSelected &&
                         !hasUnsentDraft &&
                         !needsAttentionFill &&
@@ -2072,7 +2074,7 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: {
             ) : null}
             {/* Why the thread is here, in its status color, then the project.
                 Everything else stays gray; color is reserved for status. */}
-            <div className="flex h-4 min-w-0 items-center gap-1.5 pl-6 text-xs text-muted-foreground/70">
+            <div className="flex h-4 min-w-0 items-center gap-1.5 pl-6 text-xs text-sidebar-muted-foreground">
               <span className="min-w-0 flex-1 truncate">
                 {topStatus && !isWokeStatus ? (
                   <span className={cn("font-medium", topStatus.className)}>
@@ -2094,7 +2096,9 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: {
               </span>
               {terminalStatusIcon}
               {prBadge ? (
-                <span className="inline-flex shrink-0 opacity-60 grayscale">{prBadge}</span>
+                <span className="inline-flex shrink-0 text-sidebar-muted-foreground opacity-70 grayscale [&_*]:text-current">
+                  {prBadge}
+                </span>
               ) : null}
             </div>
           </div>
