@@ -52,9 +52,8 @@ export function ForkUpdateRailButton() {
       void startUpdateChat();
       return;
     }
-    if (currentVersion === null) return;
     setSpinning(true);
-    void checkForForkUpdate(currentVersion);
+    void checkForForkUpdate();
   };
 
   const isChecking = checking || spinning;

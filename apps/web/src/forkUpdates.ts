@@ -32,23 +32,33 @@ export function isNewerVersion(candidate: string, current: string): boolean {
   return false;
 }
 
-export interface ForkUpdateState {
+interface CheckState {
   readonly checking: boolean;
-  /** Newest stable upstream release when it is newer than this build. */
-  readonly update: ForkUpdate | null;
+  /** Newest stable upstream release, as last reported by GitHub. */
+  readonly latest: ForkUpdate | null;
   /** Set after a check completes, so the UI can say "up to date". */
   readonly checkedAt: number | null;
 }
 
-let state: ForkUpdateState = { checking: false, update: null, checkedAt: null };
+export interface ForkUpdateState {
+  readonly checking: boolean;
+  /** The latest release when it is newer than this build. */
+  readonly update: ForkUpdate | null;
+  readonly checkedAt: number | null;
+}
+
+// Only GitHub's answer is stored; whether it is newer is decided when read,
+// against the current version. The app briefly reports a cached version at
+// startup, so a comparison stored at check time could go stale.
+let state: CheckState = { checking: false, latest: null, checkedAt: null };
 const listeners = new Set<() => void>();
-function setState(next: Partial<ForkUpdateState>): void {
+function setState(next: Partial<CheckState>): void {
   state = { ...state, ...next };
   for (const listener of listeners) listener();
 }
 
 /** Checks GitHub now. Safe to call repeatedly; overlapping checks are skipped. */
-export async function checkForForkUpdate(currentVersion: string): Promise<void> {
+export async function checkForForkUpdate(): Promise<void> {
   if (state.checking) return;
   setState({ checking: true });
   try {
@@ -60,9 +70,7 @@ export async function checkForForkUpdate(currentVersion: string): Promise<void> 
     const version = release.tag_name?.replace(/^v/, "");
     if (!version) return;
     setState({
-      update: isNewerVersion(version, currentVersion)
-        ? { version, url: release.html_url ?? LATEST_STABLE_RELEASE_URL }
-        : null,
+      latest: { version, url: release.html_url ?? LATEST_STABLE_RELEASE_URL },
       checkedAt: Date.now(),
     });
   } catch {
@@ -83,15 +91,17 @@ export function useForkUpdate(): ForkUpdateState & { readonly currentVersion: st
     () => state,
   );
   useEffect(() => {
-    if (currentVersion === null) return;
-    void checkForForkUpdate(currentVersion);
-    const interval = window.setInterval(
-      () => void checkForForkUpdate(currentVersion),
-      CHECK_INTERVAL_MS,
-    );
+    void checkForForkUpdate();
+    const interval = window.setInterval(() => void checkForForkUpdate(), CHECK_INTERVAL_MS);
     return () => window.clearInterval(interval);
-  }, [currentVersion]);
-  return { ...snapshot, currentVersion };
+  }, []);
+  const update =
+    snapshot.latest !== null &&
+    currentVersion !== null &&
+    isNewerVersion(snapshot.latest.version, currentVersion)
+      ? snapshot.latest
+      : null;
+  return { checking: snapshot.checking, update, checkedAt: snapshot.checkedAt, currentVersion };
 }
 
 /** Instructions pasted into the update chat; the maintainer reviews them before sending. */
