@@ -9,6 +9,15 @@ import { primaryServerKeybindingsAtom } from "../../state/server";
 import { T3Wordmark } from "../T3Wordmark";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 
+// The router only reports back history. Chromium's Navigation API knows about
+// forward entries too; re-read it whenever the location changes. Where the API
+// is missing, forward stays enabled (the old behavior).
+function useCanGoForward(): boolean {
+  useLocation({ select: (location) => location.href });
+  const navigation = (window as { navigation?: { canGoForward?: boolean } }).navigation;
+  return navigation?.canGoForward ?? true;
+}
+
 function TopBarButton(props: {
   label: string;
   disabled?: boolean;
@@ -42,6 +51,7 @@ function TopBarButton(props: {
 export function AppTopBar() {
   const router = useRouter();
   const canGoBack = useCanGoBack();
+  const canGoForward = useCanGoForward();
   const keybindings = useAtomValue(primaryServerKeybindingsAtom);
   const usagePageOpen = useLocation({ select: (location) => location.pathname === "/usage" });
   const shortcut = (command: "commandPalette.toggle") =>
@@ -62,7 +72,11 @@ export function AppTopBar() {
         <TopBarButton label="Back" disabled={!canGoBack} onClick={() => router.history.back()}>
           <ArrowLeftIcon />
         </TopBarButton>
-        <TopBarButton label="Forward" onClick={() => router.history.forward()}>
+        <TopBarButton
+          label="Forward"
+          disabled={!canGoForward}
+          onClick={() => router.history.forward()}
+        >
           <ArrowRightIcon />
         </TopBarButton>
       </div>

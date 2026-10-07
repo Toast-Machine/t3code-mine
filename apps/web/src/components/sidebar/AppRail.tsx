@@ -3,8 +3,6 @@ import type { ReactNode } from "react";
 import { useLocation, useNavigate, useRouter } from "@tanstack/react-router";
 import { useEffect } from "react";
 
-import { useSidebar } from "../ui/sidebar";
-
 import { cn } from "../../lib/utils";
 import { useEnvironments } from "../../state/environments";
 import { PullRequestGlyph } from "../pullRequest/pullRequestIcons";
@@ -60,7 +58,6 @@ export function AppRail() {
   const navigateToMainApp = useNavigateToMainApp();
   const pathname = useLocation({ select: (location) => location.pathname });
   const { environments } = useEnvironments();
-  const { open, setOpen } = useSidebar();
   const router = useRouter();
   // Pages are split chunks. Load every rail destination once the app is idle so
   // switching pages never renders an empty frame while code downloads.
@@ -91,15 +88,12 @@ export function AppRail() {
       aria-label="App"
       data-app-sidebar=""
       data-app-rail=""
-      className="relative z-20 hidden h-[calc(100dvh-var(--app-topbar-height))] w-(--app-rail-width) shrink-0 flex-col items-center gap-1.5 bg-sidebar-shell pt-(--app-rail-top) pb-3 md:flex [&_button]:[-webkit-app-region:no-drag]"
+      className="relative z-20 hidden h-[calc(100dvh-var(--app-topbar-height))] w-(--app-rail-width) shrink-0 flex-col items-center gap-1.5 bg-sidebar-shell py-(--app-rail-inset) md:flex [&_button]:[-webkit-app-region:no-drag]"
     >
       <RailButton
         label="Threads"
         active={page === "threads"}
-        onClick={() => {
-          if (page === "threads" && !open) setOpen(true);
-          else void navigateToMainApp();
-        }}
+        onClick={() => void navigateToMainApp()}
       >
         <MessagesSquareIcon />
       </RailButton>

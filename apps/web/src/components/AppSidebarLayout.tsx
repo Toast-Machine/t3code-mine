@@ -305,13 +305,13 @@ export function AppSidebarLayout({ children }: { children: ReactNode }) {
   const sidebarProviderStyle = {
     // Shell geometry. The top bar spans the window (holding the macOS window
     // buttons, centered over the rail); the rail owns the left gutter up to the
-    // panel, so its icons center by layout alone; its first icon aligns with
-    // the panel's top edge. The desktop app mirrors these numbers in
+    // panel, so its icons center by layout alone; its first and last icons sit
+    // the same distance inside the panel's top and bottom edges. The desktop app mirrors these numbers in
     // macosWindowButtonPosition.
     "--app-topbar-height": "2.25rem",
     "--app-topbar-start": isMacosDesktop && !isWindowFullscreen ? "5rem" : "0.75rem",
     "--app-rail-width": "4.5rem",
-    "--app-rail-top": "0.5rem",
+    "--app-rail-inset": "1rem",
     "--workspace-controls-top": "var(--app-topbar-height)",
     "--sidebar-width": `${sidebarWidth}px`,
     "--panel-animation-duration": `${panelAnimationDurationMs}ms`,
