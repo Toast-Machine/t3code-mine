@@ -1487,7 +1487,6 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: {
     topStatus?.icon === "done" || topStatus?.icon === "input" || topStatus?.icon === "approval";
   const rowSurfaceClassName = cn(
     "group/sidebar-row relative w-full cursor-pointer overflow-hidden rounded-xl text-left text-sidebar-foreground outline-none select-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring",
-    variantAction === "unsettle" && "[&:not(:hover):not(:focus-within)_*]:text-secondary-label/70",
     props.isActive
       ? activeSurfaceClassName
       : isSelected
@@ -1575,14 +1574,8 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: {
                 : "text-sidebar-foreground/90",
             )
           : cn(
-              "truncate group-focus-within/sidebar-row:text-foreground group-hover/sidebar-row:text-foreground",
-              shouldRecede
-                ? "text-secondary-label/70"
-                : props.isActive || isWoke || status === "input"
-                  ? "text-foreground"
-                  : isUnread
-                    ? "text-muted-foreground"
-                    : "text-secondary-label/70",
+              "truncate",
+              props.isActive ? "text-sidebar-foreground" : "text-sidebar-foreground/80",
             ),
         isRegeneratingTitle && "opacity-55",
       )}
@@ -1798,8 +1791,7 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: {
             <span
               className={cn(
                 "shrink-0 transition-opacity",
-                (!props.isActive || variantAction === "unsettle") &&
-                  "opacity-40 grayscale group-focus-within/sidebar-row:opacity-100 group-focus-within/sidebar-row:grayscale-0 group-hover/sidebar-row:opacity-100 group-hover/sidebar-row:grayscale-0",
+                (!props.isActive || variantAction === "unsettle") && "opacity-80",
               )}
             >
               {props.project ? <ProjectFavicon project={props.project} className="size-4" /> : null}
@@ -1816,7 +1808,11 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: {
             {/* The PR badge stays outside the hover-fading slot: it must
               remain visible AND clickable while the row is hovered. Only
               the time/jump label yields to the settle affordance. */}
-            {prBadge}
+            {prBadge ? (
+              <span className="inline-flex shrink-0 text-sidebar-muted-foreground opacity-70 grayscale [&_*]:text-current">
+                {prBadge}
+              </span>
+            ) : null}
             {sortable?.isDragging ? (
               dragDestination
             ) : (
