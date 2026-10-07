@@ -74,9 +74,15 @@ manually. Custom applies separate worktree rules to the selected project or chec
 captures and log retention remain machine-wide.
 
 Worktrees can be removed after a chosen number of inactive days, after merging, or when they
-have no commits beyond the default branch. Only T3-managed worktrees are eligible. Active
-sessions, shared worktrees, uncommitted changes, and ignored files other than `node_modules`
-prevent removal. Branches and thread history stay; starting another turn recreates the checkout.
+have no commits beyond the default branch. Only T3-managed worktrees are eligible, and active
+sessions or shared worktrees prevent removal. Branches and thread history stay; starting another
+turn recreates the checkout.
+
+Before removing a worktree, T3 Code backs up every file Git doesn't hold, such as uncommitted
+edits and `.env` files, to `~/.t3/worktree-backups/`, and keeps each backup for 30 days. Files
+identical to the project's main checkout and rebuildable folders such as `node_modules` and
+`dist` are skipped. A worktree with more than 100 MB to back up is kept instead, and uncommitted
+edits keep a worktree that would only be removed for having no commits.
 Merge cleanup requires the commits to be included in the remote default branch, so squash merges
 may need the inactivity rule instead.
 

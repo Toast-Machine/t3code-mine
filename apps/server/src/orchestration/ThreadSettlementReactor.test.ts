@@ -1559,6 +1559,13 @@ describe("storage cleanup", () => {
     "dirty",
     "ignored",
     "ignored-directory",
+    "ignored-copies",
+    "ignored-directory-copy",
+    "ignored-rebuildable",
+    "ignored-node-modules-link",
+    "ignored-changed-copy",
+    "ignored-unique",
+    "ignored-too-large",
     "shared",
     "project-root",
     "nested-project",
@@ -1571,6 +1578,7 @@ describe("storage cleanup", () => {
     "unmerged",
     "unchanged",
     "unchanged-two-worktrees",
+    "unchanged-dirty",
     "diverged",
     "head-moved",
     "deleted",
@@ -1618,6 +1626,66 @@ describe("storage cleanup", () => {
             yield* fs.makeDirectory(path.join(worktreePath, ".cache"));
             yield* fs.writeFileString(path.join(worktreePath, ".cache", "local-data"), "keep");
           }
+          // The project's main checkout is config.baseDir.
+          const writeCopy = (relative: string, contents: string, original = contents) =>
+            Effect.gen(function* () {
+              for (const [root, text] of [
+                [worktreePath, contents],
+                [config.baseDir, original],
+              ] as const) {
+                yield* fs.makeDirectory(path.dirname(path.join(root, relative)), {
+                  recursive: true,
+                });
+                yield* fs.writeFileString(path.join(root, relative), text);
+              }
+            });
+          if (protection === "ignored-copies") {
+            yield* writeCopy(".env.hosted.local", "HOSTED=1");
+            yield* writeCopy("platform-admin/.env", "ADMIN=1");
+          }
+          if (protection === "ignored-directory-copy") {
+            yield* writeCopy(".cache/a", "a");
+            yield* writeCopy(".cache/nested/b", "b");
+          }
+          if (protection === "ignored-changed-copy")
+            yield* writeCopy(".env.local", "LOCAL=changed", "LOCAL=original");
+          if (protection === "ignored-unique")
+            yield* fs.writeFileString(path.join(worktreePath, "notes.local"), "only here");
+          if (protection === "ignored-too-large") {
+            // Sparse, so the test does not write 101 MB.
+            yield* fs.writeFileString(path.join(worktreePath, "dataset.bin"), "");
+            yield* fs.truncate(path.join(worktreePath, "dataset.bin"), 101 * 1024 * 1024);
+          }
+          const dirty =
+            protection === "dirty" ||
+            protection === "deleted-dirty" ||
+            protection === "unchanged-dirty";
+          if (dirty) {
+            yield* writeCopy("src/edited.ts", "edited", "original");
+            yield* writeCopy("src/same.ts", "same");
+            yield* fs.writeFileString(path.join(worktreePath, "renamed.ts"), "renamed");
+            yield* fs.makeDirectory(path.join(worktreePath, "notes"));
+            yield* fs.writeFileString(path.join(worktreePath, "notes", "new.md"), "new");
+          }
+          const backupsDir = path.join(path.dirname(config.worktreesDir), "worktree-backups");
+          const expiredBackup = path.join(backupsDir, "Project", "expired");
+          const keptBackup = path.join(backupsDir, "Project", "kept");
+          for (const [backup, time] of [
+            [expiredBackup, "2026-07-01T00:00:00.000Z"],
+            [keptBackup, NOW],
+          ] as const) {
+            yield* fs.makeDirectory(backup, { recursive: true });
+            yield* fs.writeFileString(path.join(backup, ".env"), "backup");
+            const date = DateTime.toDateUtc(DateTime.makeUnsafe(time));
+            yield* fs.utimes(backup, date, date);
+          }
+          if (protection === "ignored-node-modules-link") {
+            yield* fs.makeDirectory(path.join(config.baseDir, "node_modules"), { recursive: true });
+            yield* fs.symlink(
+              path.join(config.baseDir, "node_modules"),
+              path.join(worktreePath, "node_modules"),
+            );
+          }
           yield* fs.makeDirectory(config.browserArtifactsDir, { recursive: true });
           const oldImage = path.join(config.browserArtifactsDir, "old.png");
           const recentImage = path.join(config.browserArtifactsDir, "recent.png");
@@ -1658,10 +1726,24 @@ describe("storage cleanup", () => {
           const deleteRule = protection.startsWith("deleted");
           let tombstoned = deleteRule && protection !== "deleted-event";
           const removals: string[] = [];
-          const mergeRule = protection === "merged" || protection === "unmerged";
+          const ignoredEntries: Partial<Record<typeof protection, string>> = {
+            "ignored-copies": ".env.hosted.local\0platform-admin/.env\0",
+            "ignored-directory-copy": ".cache/\0",
+            "ignored-rebuildable":
+              ".husky/_/\0supabase/.temp/\0dist/\0platform-admin/dist/\0tests/browser/.artifacts/\0node_modules/\0",
+            "ignored-node-modules-link": "node_modules\0",
+            "ignored-changed-copy": ".env.local\0",
+            "ignored-unique": "notes.local\0",
+            "ignored-too-large": "dataset.bin\0",
+          };
+          const mergeRule =
+            protection === "merged" ||
+            protection === "unmerged" ||
+            (protection.startsWith("ignored-") && protection !== "ignored-directory");
           const unchangedRule =
             protection === "unchanged" ||
             protection === "unchanged-two-worktrees" ||
+            protection === "unchanged-dirty" ||
             protection === "diverged" ||
             protection === "head-moved";
           let headReads = 0;
@@ -1882,8 +1964,7 @@ describe("storage cleanup", () => {
                       isDefaultBranch: false,
                       branch: cwd === secondWorktreePath ? "feature-two" : "feature",
                       upstreamRef: null,
-                      hasWorkingTreeChanges:
-                        protection === "dirty" || protection === "deleted-dirty",
+                      hasWorkingTreeChanges: dirty,
                       workingTree: { files: [], insertions: 0, deletions: 0 },
                       hasUpstream: false,
                       aheadCount: 0,
@@ -1899,11 +1980,15 @@ describe("storage cleanup", () => {
                           : 0,
                       ),
                       stdout:
-                        protection === "ignored" || protection === "deleted-ignored"
-                          ? ".env\0"
-                          : protection === "ignored-directory"
-                            ? ".cache/\0"
-                            : "",
+                        input.operation === "StorageCleanup.changedFiles"
+                          ? dirty
+                            ? " M src/edited.ts\0 M src/same.ts\0 D gone.ts\0R  renamed.ts\0old.ts\0?? notes/new.md\0"
+                            : ""
+                          : protection === "ignored" || protection === "deleted-ignored"
+                            ? ".env\0"
+                            : protection === "ignored-directory"
+                              ? ".cache/\0"
+                              : (ignoredEntries[protection] ?? ""),
                       stderr: "",
                       stdoutTruncated: false,
                       stderrTruncated: false,
@@ -1935,7 +2020,7 @@ describe("storage cleanup", () => {
                       ),
                     ),
                   removeWorktree: (input) => {
-                    assert.strictEqual(input.force, false);
+                    assert.strictEqual(input.force, dirty);
                     removals.push(input.path);
                     return fs.remove(input.path, { recursive: true }).pipe(Effect.orDie);
                   },
@@ -2007,6 +2092,17 @@ describe("storage cleanup", () => {
             protection === "files-disabled" ||
             protection === "files-extended" ||
             protection === "merged" ||
+            protection === "ignored-copies" ||
+            protection === "ignored-directory-copy" ||
+            protection === "ignored-rebuildable" ||
+            protection === "ignored-node-modules-link" ||
+            protection === "ignored-changed-copy" ||
+            protection === "ignored-unique" ||
+            protection === "ignored" ||
+            protection === "ignored-directory" ||
+            protection === "deleted-ignored" ||
+            protection === "dirty" ||
+            protection === "deleted-dirty" ||
             protection === "unchanged" ||
             protection === "unchanged-two-worktrees";
           assert.strictEqual(yield* fs.exists(worktreePath), !removed);
@@ -2019,6 +2115,50 @@ describe("storage cleanup", () => {
                 : [],
           );
           assert.strictEqual(fetches, mergeRule || unchangedRule ? 1 : 0);
+          // Removal backs up exactly the files that exist nowhere else.
+          const expectedBackup: Record<string, string> =
+            protection === "ignored" || protection === "deleted-ignored"
+              ? { ".env": "secret" }
+              : protection === "ignored-directory"
+                ? { ".cache/local-data": "keep" }
+                : protection === "ignored-changed-copy"
+                  ? { ".env.local": "LOCAL=changed" }
+                  : protection === "ignored-unique"
+                    ? { "notes.local": "only here" }
+                    : protection === "dirty" || protection === "deleted-dirty"
+                      ? {
+                          "src/edited.ts": "edited",
+                          "renamed.ts": "renamed",
+                          "notes/new.md": "new",
+                        }
+                      : {};
+          const backups = (yield* fs.readDirectory(backupsDir)).filter(
+            (name) => name !== "Project",
+          );
+          assert.deepStrictEqual(
+            backups,
+            Object.keys(expectedBackup).length > 0 ? ["feature-2026-08-28-12-00"] : [],
+          );
+          const backedUp: Record<string, string> = {};
+          for (const backup of backups) {
+            for (const file of yield* fs.readDirectory(path.join(backupsDir, backup), {
+              recursive: true,
+            })) {
+              const target = path.join(backupsDir, backup, file);
+              if ((yield* fs.stat(target)).type === "File")
+                backedUp[file] = yield* fs.readFileString(target);
+            }
+          }
+          assert.deepStrictEqual(backedUp, expectedBackup);
+          assert.strictEqual(yield* fs.exists(expiredBackup), false);
+          assert.strictEqual(yield* fs.exists(keptBackup), true);
+          if (protection === "ignored-node-modules-link")
+            assert.strictEqual(yield* fs.exists(path.join(config.baseDir, "node_modules")), true);
+          if (protection === "ignored-copies")
+            assert.strictEqual(
+              yield* fs.exists(path.join(config.baseDir, ".env.hosted.local")),
+              true,
+            );
           assert.strictEqual(thread.worktreePath, worktreePath);
           assert.strictEqual(thread.branch, "feature");
           assert.strictEqual(yield* fs.exists(oldImage), protection.startsWith("files-"));

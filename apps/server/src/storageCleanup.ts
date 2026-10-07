@@ -45,6 +45,14 @@ export class StorageCleanup extends Context.Service<
 >()("t3/storageCleanup") {}
 
 const DAY_MS = 86_400_000;
+/** Ignored paths inside directories that installs, builds, and tools regenerate, at any depth. */
+const REBUILDABLE_IGNORED_PATH =
+  /(^|\/)(node_modules|\.husky\/_|dist|\.astro|\.build|\.preview|supabase\/\.temp|tests\/browser\/\.artifacts)\//;
+const MAX_COMPARED_FILE_BYTES = 8 * 1024 * 1024;
+// Worktrees with more unique data than this are kept rather than backed up.
+const MAX_BACKUP_BYTES = 100 * 1024 * 1024;
+const MAX_SCANNED_ENTRIES = 10_000;
+const BACKUP_RETENTION_DAYS = 30;
 
 const worktreeCleanupEnabled = (rules: WorktreeCleanupRules) =>
   rules.worktreeAfterDays !== null ||
@@ -117,6 +125,7 @@ export const make = Effect.gen(function* () {
   const terminals = yield* TerminalManager.TerminalManager;
   const fs = yield* FileSystem.FileSystem;
   const path = yield* Path.Path;
+  const worktreeBackupsDir = path.join(path.dirname(config.worktreesDir), "worktree-backups");
   const liveTerminals = new Map<string, Map<string, TerminalSummary>>();
   const noteTerminal = (terminal: TerminalSummary) => {
     const threadTerminals =
@@ -170,6 +179,143 @@ export const make = Effect.gen(function* () {
     return false;
   });
 
+  const isSymlink = (target: string) =>
+    fs.readLink(target).pipe(
+      Effect.as(true),
+      Effect.orElseSucceed(() => false),
+    );
+
+  // True when the worktree file is a byte-identical copy of the main checkout's
+  // file at the same relative path, such as an env file copied in at setup.
+  const sameAsMainCheckout = Effect.fn("StorageCleanup.sameAsMainCheckout")(
+    function* (worktreePath: string, workspaceRoot: string, relative: string) {
+      const copy = path.join(worktreePath, relative);
+      const original = path.join(workspaceRoot, relative);
+      // An original that resolves into this worktree would be removed with it.
+      const originalReal = yield* fs.realPath(original);
+      if (originalReal === worktreePath || inside(worktreePath, originalReal)) return false;
+      const [copyInfo, originalInfo] = yield* Effect.all([fs.stat(copy), fs.stat(original)]);
+      if (
+        copyInfo.type !== "File" ||
+        originalInfo.type !== "File" ||
+        copyInfo.size !== originalInfo.size ||
+        Number(copyInfo.size) > MAX_COMPARED_FILE_BYTES
+      )
+        return false;
+      const [copyBytes, originalBytes] = yield* Effect.all([
+        fs.readFile(copy),
+        fs.readFile(original),
+      ]);
+      return Buffer.from(copyBytes).equals(originalBytes);
+    },
+    Effect.orElseSucceed(() => false),
+  );
+
+  /**
+   * Files that would exist nowhere else once the worktree is removed: uncommitted
+   * and untracked files plus ignored files, minus rebuildable paths and identical
+   * copies of the main checkout. Null when there is too much to back up.
+   */
+  const uniqueFiles = Effect.fn("StorageCleanup.uniqueFiles")(function* (
+    worktreePath: string,
+    workspaceRoot: string,
+  ) {
+    const listGit = (operation: string, args: ReadonlyArray<string>) =>
+      git.execute({ operation, cwd: worktreePath, args, maxOutputBytes: 1024 * 1024 });
+    const ignored = yield* listGit("StorageCleanup.ignoredFiles", [
+      "ls-files",
+      "--others",
+      "--ignored",
+      "--exclude-standard",
+      "--directory",
+      "-z",
+    ]);
+    const changed = yield* listGit("StorageCleanup.changedFiles", [
+      "status",
+      "--porcelain",
+      "-z",
+      "--untracked-files=all",
+    ]);
+    if (ignored.stdoutTruncated || changed.stdoutTruncated) return null;
+    const entries: string[] = [];
+    for (const entry of ignored.stdout.split("\0")) {
+      if (entry === "" || REBUILDABLE_IGNORED_PATH.test(entry)) continue;
+      // A symlinked node_modules is listed without a trailing slash.
+      if (/(^|\/)node_modules$/.test(entry) && (yield* isSymlink(path.join(worktreePath, entry))))
+        continue;
+      entries.push(entry);
+    }
+    // Porcelain -z records are "XY path"; renames and copies add the source path.
+    const records = changed.stdout.split("\0");
+    for (let index = 0; index < records.length; index++) {
+      const record = records[index]!;
+      if (record.length < 4) continue;
+      if (/[RC]/.test(record.slice(0, 2))) index++;
+      entries.push(record.slice(3));
+    }
+    const root = path.resolve(workspaceRoot);
+    const files: string[] = [];
+    let scanned = 0;
+    let bytes = 0;
+    const visit = Effect.fn("StorageCleanup.visitUniqueFile")(function* (
+      relative: string,
+    ): Effect.fn.Return<boolean, PlatformError> {
+      if (++scanned > MAX_SCANNED_ENTRIES) return false;
+      const target = path.join(worktreePath, relative);
+      // Deleted tracked files are still in Git; removing a symlink loses nothing.
+      if (!(yield* fs.exists(target)) || (yield* isSymlink(target))) return true;
+      const info = yield* fs.stat(target);
+      if (info.type === "Directory") {
+        if (REBUILDABLE_IGNORED_PATH.test(`${relative}/`)) return true;
+        for (const child of yield* fs.readDirectory(target))
+          if (!(yield* visit(path.join(relative, child)))) return false;
+        return true;
+      }
+      if (yield* sameAsMainCheckout(worktreePath, root, relative)) return true;
+      bytes += Number(info.size);
+      files.push(relative);
+      return bytes <= MAX_BACKUP_BYTES;
+    });
+    for (const entry of new Set(entries)) if (!(yield* visit(entry))) return null;
+    return files;
+  });
+
+  // Copies files into a dated folder under worktree-backups, mirroring their
+  // place in the worktree, so they can be restored by hand.
+  const backUp = Effect.fn("StorageCleanup.backUp")(function* (
+    worktreePath: string,
+    relativeWorktree: string,
+    files: ReadonlyArray<string>,
+    now: number,
+  ) {
+    const stamp = DateTime.formatIso(DateTime.makeUnsafe(now)).slice(0, 16).replace(/[:T]/g, "-");
+    const destination = path.join(worktreeBackupsDir, `${relativeWorktree}-${stamp}`);
+    for (const file of files) {
+      const target = path.join(destination, file);
+      yield* fs.makeDirectory(path.dirname(target), { recursive: true });
+      yield* fs.copyFile(path.join(worktreePath, file), target);
+    }
+    return destination;
+  });
+
+  const cleanBackups = Effect.fn("StorageCleanup.cleanBackups")(function* (now: number) {
+    if (!(yield* fs.exists(worktreeBackupsDir))) return;
+    const realRoot = yield* fs.realPath(worktreeBackupsDir);
+    if (realRoot !== path.resolve(worktreeBackupsDir)) return;
+    for (const project of yield* fs.readDirectory(realRoot)) {
+      const projectDir = path.join(realRoot, project);
+      if ((yield* fs.realPath(projectDir)) !== projectDir) continue;
+      if ((yield* fs.stat(projectDir)).type !== "Directory") continue;
+      for (const backup of yield* fs.readDirectory(projectDir)) {
+        const target = path.join(projectDir, backup);
+        if ((yield* fs.realPath(target)) !== target) continue;
+        const modified = Option.getOrNull((yield* fs.stat(target)).mtime);
+        if (modified !== null && modified.getTime() < now - BACKUP_RETENTION_DAYS * DAY_MS)
+          yield* fs.remove(target, { recursive: true });
+      }
+    }
+  });
+
   const cleanWorktrees = Effect.fn("StorageCleanup.cleanWorktrees")(function* (
     serverSettings: ServerSettings,
     now: number,
@@ -220,24 +366,8 @@ export const make = Effect.gen(function* () {
         // A linked worktree has a .git file. Never remove a main checkout.
         if ((yield* fs.stat(path.join(worktreePath, ".git"))).type !== "File") return;
         const status = yield* git.statusDetailsLocal(worktreePath);
-        if (!status.isRepo || status.branch !== thread.branch || status.hasWorkingTreeChanges)
-          return;
+        if (!status.isRepo || status.branch !== thread.branch) return;
         const head = yield* git.resolveCommit({ cwd: worktreePath, revision: "HEAD" });
-        const ignored = yield* git.execute({
-          operation: "StorageCleanup.ignoredFiles",
-          cwd: worktreePath,
-          args: ["ls-files", "--others", "--ignored", "--exclude-standard", "--directory", "-z"],
-          maxOutputBytes: 64 * 1024,
-        });
-        // Ignored files can contain secrets or local datasets. Dependency installs
-        // are reproducible; every other ignored path prevents automatic removal.
-        if (
-          ignored.stdoutTruncated ||
-          ignored.stdout
-            .split("\0")
-            .some((entry) => entry !== "" && !/(^|\/)node_modules\/$/.test(entry))
-        )
-          return;
         const old =
           !deleted &&
           settings.worktreeAfterDays !== null &&
@@ -270,7 +400,8 @@ export const make = Effect.gen(function* () {
             allowNonZeroExit: true,
           });
           if (ancestor.exitCode !== 0) return;
-          eligible = settings.worktreeUnchanged;
+          // "Unchanged" means no work happened here, so uncommitted edits disqualify it.
+          eligible = settings.worktreeUnchanged && !status.hasWorkingTreeChanges;
           if (!eligible && settings.worktreeOnMerge && thread.branch !== null) {
             const pullRequest = yield* gitManager.branchPullRequest(
               { cwd: worktreePath, branch: thread.branch },
@@ -320,7 +451,7 @@ export const make = Effect.gen(function* () {
         if (
           !finalStatus.isRepo ||
           finalStatus.branch !== thread.branch ||
-          finalStatus.hasWorkingTreeChanges
+          finalStatus.hasWorkingTreeChanges !== status.hasWorkingTreeChanges
         )
           return;
         if (
@@ -328,19 +459,8 @@ export const make = Effect.gen(function* () {
           head.commitSha
         )
           return;
-        const finalIgnored = yield* git.execute({
-          operation: "StorageCleanup.ignoredFiles",
-          cwd: worktreePath,
-          args: ["ls-files", "--others", "--ignored", "--exclude-standard", "--directory", "-z"],
-          maxOutputBytes: 64 * 1024,
-        });
-        if (
-          finalIgnored.stdoutTruncated ||
-          finalIgnored.stdout
-            .split("\0")
-            .some((entry) => entry !== "" && !/(^|\/)node_modules\/$/.test(entry))
-        )
-          return;
+        const files = yield* uniqueFiles(worktreePath, project.workspaceRoot);
+        if (files === null) return;
         const current = resolveWorktreeCleanup(
           yield* settingsService.getSettings,
           thread.projectId,
@@ -352,11 +472,22 @@ export const make = Effect.gen(function* () {
           )
         )
           return;
-        yield* git.removeWorktree({ cwd: project.workspaceRoot, path: worktreePath, force: false });
+        // Nothing unique is lost: commits stay on the branch, and every file Git
+        // does not hold is backed up first. A failed backup aborts the removal.
+        const backup =
+          files.length > 0
+            ? yield* backUp(worktreePath, path.relative(root, worktreePath), files, now)
+            : null;
+        // Git refuses to remove a worktree with uncommitted changes unless forced.
+        yield* git.removeWorktree({
+          cwd: project.workspaceRoot,
+          path: worktreePath,
+          force: finalStatus.hasWorkingTreeChanges,
+        });
         yield* gitManager.invalidateStatus(project.workspaceRoot);
         // Preserve branch and path: ProviderCommandReactor recreates the checkout
         // from that branch when the thread is resumed.
-        yield* Effect.logInfo("storage cleanup removed worktree", { threadId: thread.id });
+        yield* Effect.logInfo("storage cleanup removed worktree", { threadId: thread.id, backup });
       }).pipe(
         (effect) => withWorkspaceLease(worktreePath, effect),
         Effect.catch((error) =>
@@ -415,6 +546,9 @@ export const make = Effect.gen(function* () {
     );
     yield* cleanFiles(config.logsDir, settings.logsAfterDays, now, true).pipe(
       Effect.catch((error) => Effect.logWarning("rotated log cleanup failed", { error })),
+    );
+    yield* cleanBackups(now).pipe(
+      Effect.catch((error) => Effect.logWarning("worktree backup cleanup failed", { error })),
     );
   });
   const worker = yield* makeDrainableWorker(() =>
