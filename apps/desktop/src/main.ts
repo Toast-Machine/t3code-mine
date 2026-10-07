@@ -67,9 +67,7 @@ import * as DesktopWindow from "./window/DesktopWindow.ts";
 import * as DesktopWslBackend from "./wsl/DesktopWslBackend.ts";
 import * as DesktopWslEnvironment from "./wsl/DesktopWslEnvironment.ts";
 import * as DesktopWslServerTree from "./wsl/DesktopWslServerTree.ts";
-import { quitIfAnotherT3CodeIsRunning } from "./otherInstanceGuard.ts";
-
-quitIfAnotherT3CodeIsRunning();
+import { explainAndQuit, findOtherRunningT3Code } from "./otherInstanceGuard.ts";
 
 const desktopEnvironmentLayer = Layer.unwrap(
   Effect.gen(function* () {
@@ -230,4 +228,9 @@ const desktopRuntimeLayer = desktopClerkLayer.pipe(
   Layer.provideMerge(DesktopPreReadyPlatform.layer),
 );
 
-DesktopApp.program.pipe(Effect.provide(desktopRuntimeLayer), NodeRuntime.runMain);
+const otherRunningT3Code = findOtherRunningT3Code();
+if (otherRunningT3Code === null) {
+  DesktopApp.program.pipe(Effect.provide(desktopRuntimeLayer), NodeRuntime.runMain);
+} else {
+  explainAndQuit(otherRunningT3Code);
+}

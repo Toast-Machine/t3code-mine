@@ -5,11 +5,12 @@ import * as Electron from "electron";
 
 // Personal build guard. This app shares ~/.t3 and its data folder with the
 // official T3 Code app, and Electron skips its single-instance lock on macOS,
-// so two copies could write the same chat database at once. If another T3
-// Code app is already running, explain and quit before touching any data.
-export function quitIfAnotherT3CodeIsRunning(): void {
+// so two copies could write the same chat database at once. Returns the name
+// of another running T3 Code app, if any, so startup can stop before touching
+// any data.
+export function findOtherRunningT3Code(): string | null {
   // oxlint-disable-next-line t3code/no-global-process-runtime -- Runs before any Effect runtime.
-  if (process.platform !== "darwin" || !Electron.app.isPackaged) return;
+  if (process.platform !== "darwin" || !Electron.app.isPackaged) return null;
   const ownBundle = process.execPath.slice(0, process.execPath.indexOf(".app/") + 5);
   let processPaths: string[];
   try {
@@ -17,23 +18,23 @@ export function quitIfAnotherT3CodeIsRunning(): void {
       encoding: "utf8",
     }).split("\n");
   } catch {
-    return;
+    return null;
   }
   const other = processPaths.find(
     (path) => path.includes(".app/Contents/MacOS/T3 Code") && !path.startsWith(ownBundle),
   );
-  if (other === undefined) return;
-  const otherName = other.slice(other.lastIndexOf("/") + 1);
-  // Electron cannot show a dialog this early on macOS, so ask the system to
-  // show a plain alert and wait for the user to dismiss it.
-  const message = `${otherName} is running and uses the same chats and settings. Quit it first, then open this app again.`;
-  try {
-    NodeChildProcess.execFileSync("/usr/bin/osascript", [
-      "-e",
-      `display alert "T3 Code is already open" message ${JSON.stringify(message)} as warning`,
-    ]);
-  } catch {
-    // The alert is best effort; quitting is what protects the data.
-  }
-  Electron.app.exit(0);
+  return other === undefined ? null : other.slice(other.lastIndexOf("/") + 1);
+}
+
+// Shows why the app is not opening once Electron can draw a dialog, then quits.
+export function explainAndQuit(otherName: string): void {
+  void Electron.app.whenReady().then(() => {
+    Electron.dialog.showMessageBoxSync({
+      type: "warning",
+      message: "T3 Code is already open",
+      detail: `${otherName} is running and uses the same chats and settings. Quit it first, then open this app again.`,
+      buttons: ["OK"],
+    });
+    Electron.app.exit(0);
+  });
 }
