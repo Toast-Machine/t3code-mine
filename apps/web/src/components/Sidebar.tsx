@@ -566,10 +566,25 @@ function SortableThreadRow(props: {
   return props.children(bag);
 }
 
+// Flat, Arc-like surfaces: list rows have no fill at rest, the open row is
+// solid, and only rows that need you get a pastel fill.
+const restSurfaceClassName = "bg-transparent hover:bg-black/[0.04] dark:hover:bg-white/[0.05]";
+const activeSurfaceClassName = "bg-white dark:bg-white/[0.12]";
+const selectedSurfaceClassName = "bg-white/60 dark:bg-white/[0.08]";
+// Pinned tiles are the one filled element at rest, like Arc's favorites.
+const tileRestSurfaceClassName =
+  "bg-black/[0.045] hover:bg-black/[0.07] dark:bg-white/[0.06] dark:hover:bg-white/[0.09]";
 // Unsent work shares one look: the new-thread draft rows and thread rows
 // with unsent composer text both use this tint and pen so they read alike.
-const draftSurfaceClassName = "bg-warning/4 hover:bg-warning/8";
+const draftSurfaceClassName =
+  "bg-orange-50 hover:bg-orange-100/80 dark:bg-orange-300/10 dark:hover:bg-orange-300/15";
 const draftPenClassName = "size-3 shrink-0 text-warning-foreground";
+// Rows waiting on you are filled as a whole so they stand out at a glance:
+// pastel green for an unread finished turn, pastel amber for input or approval.
+const doneSurfaceClassName =
+  "bg-emerald-100 hover:bg-emerald-200/70 dark:bg-emerald-300/15 dark:hover:bg-emerald-300/20";
+const needsYouSurfaceClassName =
+  "bg-amber-100 hover:bg-amber-200/70 dark:bg-amber-300/15 dark:hover:bg-amber-300/20";
 
 // Structural list items — the section headers and the
 // empty-section placeholders — take part in the sortable list so they shift
@@ -807,8 +822,8 @@ const SidebarDraftRow = memo(function SidebarDraftRow(props: {
         aria-current={accessibility.current}
         data-testid="sidebar-draft-row"
         className={cn(
-          "group/sidebar-row relative w-full cursor-pointer overflow-hidden rounded-md text-left text-sidebar-foreground outline-none select-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring",
-          props.isActive ? "bg-sidebar-row-active" : draftSurfaceClassName,
+          "group/sidebar-row relative w-full cursor-pointer overflow-hidden rounded-xl text-left text-sidebar-foreground outline-none select-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring",
+          props.isActive ? activeSurfaceClassName : draftSurfaceClassName,
         )}
         onClick={handleActivate}
         onKeyDown={handleKeyDown}
@@ -1011,7 +1026,8 @@ const dropVerbBadge: Record<SidebarDropVerb, ReactNode> = {
 
 const SidebarThreadRow = memo(function SidebarThreadRow(props: {
   thread: SidebarThreadSummary;
-  variant: "card" | "slim";
+  // "tile" is a pinned thread in the pinned grid.
+  variant: "card" | "slim" | "tile";
   // Slim rows are either settled (action: un-settle) or merely quiet
   // (seen Ready threads — action: settle).
   variantAction: "settle" | "unsettle" | "unsnooze";
@@ -1444,18 +1460,22 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: {
   // like elevated cards while settled threads were plain rows, leaving neither
   // a useful hierarchy nor a reliable hover cue. Status now lives in the row
   // content; surface is reserved for interaction (hover, multi-select, route).
+  const needsAttentionFill =
+    topStatus?.icon === "done" || topStatus?.icon === "input" || topStatus?.icon === "approval";
   const rowSurfaceClassName = cn(
-    "group/sidebar-row relative w-full cursor-pointer overflow-hidden rounded-md text-left outline-none select-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring",
+    "group/sidebar-row relative w-full cursor-pointer overflow-hidden rounded-xl text-left text-sidebar-foreground outline-none select-none transition-colors focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring motion-reduce:transition-none",
     variantAction === "unsettle" && "[&:not(:hover):not(:focus-within)_*]:text-secondary-label/70",
     props.isActive
-      ? "bg-sidebar-row-active text-sidebar-foreground"
+      ? activeSurfaceClassName
       : isSelected
-        ? "bg-sidebar-row-selected text-sidebar-foreground"
+        ? selectedSurfaceClassName
         : hasUnsentDraft
-          ? cn(draftSurfaceClassName, "text-sidebar-foreground")
-          : shouldRecede
-            ? "text-sidebar-muted-foreground/75 hover:bg-sidebar-row-hover hover:text-sidebar-foreground"
-            : "bg-transparent text-sidebar-foreground hover:bg-sidebar-row-hover",
+          ? draftSurfaceClassName
+          : topStatus?.icon === "done"
+            ? doneSurfaceClassName
+            : topStatus?.icon === "input" || topStatus?.icon === "approval"
+              ? needsYouSurfaceClassName
+              : restSurfaceClassName,
     // Background work fades as a whole row, status label included, so it
     // takes less attention than rows that need a human (input, approval).
     shouldRecede &&
@@ -1637,6 +1657,91 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: {
     )
   ) : null;
 
+  if (variant === "tile") {
+    const statusIcon =
+      topStatus?.icon === "working" ? (
+        <CircleDashedIcon aria-hidden className="size-3.5 shrink-0" />
+      ) : topStatus?.icon === "input" ? (
+        <MessageCircleQuestionIcon aria-hidden className="size-3.5 shrink-0" />
+      ) : topStatus?.icon === "approval" ? (
+        <ShieldQuestionIcon aria-hidden className="size-3.5 shrink-0" />
+      ) : topStatus?.icon === "failed" ? (
+        <CircleAlertIcon aria-hidden className="size-3.5 shrink-0" />
+      ) : topStatus?.icon === "done" ? (
+        <CircleCheckIcon aria-hidden className="size-3.5 shrink-0" />
+      ) : topStatus?.icon === "woke" ? (
+        <AlarmClockIcon aria-hidden className="size-3.5 shrink-0" />
+      ) : null;
+    // Tiles stay put during drags (the drag system is vertical-only), so only
+    // the node ref is taken from the sortable bag, never its transform.
+    return (
+      <li
+        data-thread-item={threadKey}
+        ref={sortable?.setNodeRef}
+        {...(fileDropHandlers ?? {})}
+        className="min-w-0 list-none"
+      >
+        <Tooltip>
+          <TooltipTrigger
+            render={
+              <div
+                ref={rowRef}
+                role="button"
+                tabIndex={0}
+                aria-label={accessibility.label}
+                aria-current={accessibility.current}
+                data-testid="sidebar-row-tile"
+                aria-busy={isRegeneratingTitle || undefined}
+                className={cn(
+                  rowSurfaceClassName,
+                  "flex h-[4.5rem] flex-col items-center justify-center gap-1.5 px-2",
+                  props.isActive
+                    ? "ring-2 ring-sky-300 ring-inset dark:ring-sky-400/50"
+                    : !isSelected &&
+                        !hasUnsentDraft &&
+                        !needsAttentionFill &&
+                        tileRestSurfaceClassName,
+                )}
+                onClick={handleClick}
+                onDoubleClick={handleDoubleClick}
+                onKeyDown={handleKeyDown}
+                onContextMenu={handleContextMenu}
+              />
+            }
+          >
+            {accessibleTitle}
+            {statusIcon ? (
+              <span className={cn("absolute top-1.5 right-1.5 inline-flex", topStatus?.className)}>
+                {statusIcon}
+              </span>
+            ) : null}
+            <span className="absolute top-1.5 left-1.5 inline-flex">{draftIndicator}</span>
+            {props.project ? (
+              <ProjectFavicon project={props.project} className="size-4 shrink-0" />
+            ) : (
+              <PinIcon aria-hidden className="size-4 shrink-0 text-muted-foreground" />
+            )}
+            {isRenaming ? (
+              <div className="flex w-full min-w-0">{title}</div>
+            ) : (
+              <span
+                aria-hidden
+                className={cn(
+                  "line-clamp-2 w-full text-center text-xs leading-tight font-medium break-words",
+                  isRegeneratingTitle && "opacity-55",
+                )}
+              >
+                {thread.title}
+              </span>
+            )}
+            {props.jumpLabel ? <JumpHintBadge label={props.jumpLabel} /> : null}
+          </TooltipTrigger>
+          {detailsTooltip}
+        </Tooltip>
+      </li>
+    );
+  }
+
   if (variant === "slim") {
     return (
       <li
@@ -1645,7 +1750,7 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: {
         {...(fileDropHandlers ?? {})}
         className={cn(
           // Matches the h-9 row so unrendered rows never shift the list when they paint.
-          "list-none [content-visibility:auto] [contain-intrinsic-size:auto_36px]",
+          "list-none py-0.5 [content-visibility:auto] [contain-intrinsic-size:auto_36px]",
           sortable?.isDragging && "relative z-20",
         )}
       >
@@ -1792,16 +1897,14 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: {
     );
   }
 
-  const diff = latestTurnDiff(thread);
-
   return (
     <li
       data-thread-item
       {...sortableRootProps}
       {...(fileDropHandlers ?? {})}
       className={cn(
-        // Matches the h-[4.875rem] content box; the py-0.5 padding is added on top.
-        "list-none py-0.5 [content-visibility:auto] [contain-intrinsic-size:auto_78px]",
+        // Matches the h-14 content box; the py-0.5 padding is added on top.
+        "list-none py-0.5 [content-visibility:auto] [contain-intrinsic-size:auto_56px]",
         sortable?.isDragging && "relative z-20",
       )}
     >
@@ -1825,24 +1928,12 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: {
           }
         >
           {accessibleTitle}
-          <div className="relative z-10 h-[4.875rem] px-(--sidebar-row-content-inset) py-(--sidebar-content-inset)">
+          {/* Calm card: title and status first, project underneath. Branch,
+              agent, and machine details live in the hover tooltip. */}
+          <div className="relative z-10 h-14 px-(--sidebar-row-content-inset) py-2">
             <div className="flex h-5 min-w-0 items-center gap-1.5">
               {draftIndicator}
-              {props.project ? (
-                <ProjectFavicon project={props.project} className="size-4 shrink-0" />
-              ) : null}
-              {props.projectDisplayName ? (
-                <span
-                  className={cn(
-                    "min-w-0 flex-1 truncate text-secondary-label text-xs",
-                    shouldRecede ? "font-normal" : "font-medium",
-                  )}
-                >
-                  {props.projectDisplayName}
-                </span>
-              ) : (
-                <span className="flex-1" />
-              )}
+              {title}
               {pinIndicator}
               {/* The visible state owns this slot's width: status at rest,
                   actions on hover/keyboard focus or while the popover is open. Keeping
@@ -1980,48 +2071,28 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: {
                 </span>
               )}
             </div>
-            <div className="mt-1 flex min-w-0">
-              {title}
-              {isRegeneratingTitle ? (
-                <span role="status" className="sr-only">
-                  Regenerating title
-                </span>
+            {isRegeneratingTitle ? (
+              <span role="status" className="sr-only">
+                Regenerating title
+              </span>
+            ) : null}
+            <div className="mt-1 flex min-w-0 items-center gap-1.5 text-xs text-secondary-label/80">
+              {props.project ? (
+                <ProjectFavicon project={props.project} className="size-3.5 shrink-0" />
               ) : null}
-            </div>
-            <div className="mt-0.5 flex min-w-0 items-center gap-1.5 text-secondary-label text-xs">
-              {/* Always the branch. The plan step used to take this slot while
-                  working, but it truncated to a half-sentence and dropped the
-                  branch, so the row lost its most stable identifier. */}
-              {thread.branch ? (
-                <>
-                  <ThreadWorktreeIndicator thread={thread} />
-                  <span className="flex min-w-0 flex-1 text-muted-foreground/40">
-                    <MiddleTruncate value={thread.branch} showTitle={false} />
-                  </span>
-                </>
-              ) : (
-                <span className="flex-1" />
-              )}
+              <span className="min-w-0 flex-1 truncate">{props.projectDisplayName ?? ""}</span>
               {terminalStatusIcon}
               {prBadge}
-              {diff ? (
-                <span className="shrink-0 font-mono">
-                  <span className="text-diff-addition-foreground">+{diff.insertions}</span>{" "}
-                  <span className="text-diff-deletion-foreground">−{diff.deletions}</span>
-                </span>
-              ) : null}
               <span
                 aria-hidden
-                className="pointer-events-none ml-auto inline-flex shrink-0 items-center gap-1"
+                className="pointer-events-none inline-flex shrink-0 items-center gap-1 opacity-60"
               >
                 {isRemote ? (
-                  <span className="inline-flex shrink-0 items-center text-sidebar-muted-foreground/70">
-                    <EnvironmentMachineIcon
-                      aria-hidden
-                      kind={props.environmentMachine}
-                      className="size-3.5"
-                    />
-                  </span>
+                  <EnvironmentMachineIcon
+                    aria-hidden
+                    kind={props.environmentMachine}
+                    className="size-3.5"
+                  />
                 ) : null}
                 {driverKind ? (
                   <span className="inline-flex shrink-0 items-center">
@@ -2050,15 +2121,6 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: {
     </li>
   );
 });
-
-function latestTurnDiff(
-  thread: SidebarThreadSummary,
-): { insertions: number; deletions: number } | null {
-  // Shells don't carry checkpoint summaries; diff stats render only when the
-  // shell projection grows them. Kept as a seam so the row layout is ready.
-  void thread;
-  return null;
-}
 
 const SidebarSearchResultRow = memo(function SidebarSearchResultRow(props: {
   thread: SidebarThreadSummary;
@@ -4852,9 +4914,8 @@ export default function Sidebar() {
                         // from users (or the auto rules) actually parking work,
                         // not from the sidebar second-guessing what still matters.
                         // Working rows stay cards so their live status shows.
-                        const isCard =
-                          section === "active" || section === "pinned" || section === "working";
-                        const rowVariant = isCard ? "card" : "slim";
+                        const isCard = section === "active" || section === "working";
+                        const rowVariant = section === "pinned" ? "tile" : isCard ? "card" : "slim";
                         return (
                           <SidebarThreadRow
                             // Fade between card and compact rows while the outer
@@ -4963,6 +5024,7 @@ export default function Sidebar() {
                             disabled={
                               renamingThreadKey === threadKey ||
                               section === "working" ||
+                              section === "pinned" ||
                               !draggableThreadKeys.has(threadKey) ||
                               optimisticDrop !== null
                             }
@@ -4982,7 +5044,28 @@ export default function Sidebar() {
                           onNavigateToDraft={navigateToDraft}
                         />,
                       ];
+                      // Pinned threads render as a grid of tiles in one list item.
+                      let pinnedTiles: ReactNode[] | null = null;
                       for (const item of sidebarListItems) {
+                        if (item.kind === "thread" && item.section === "pinned") {
+                          const tile = renderThreadRow(threadByKey.get(item.key)!, item.section);
+                          if (pinnedTiles === null) {
+                            pinnedTiles = [tile];
+                            items.push(
+                              <li key="pinned-grid" className="list-none pb-1.5">
+                                <ul
+                                  role="presentation"
+                                  className="grid grid-cols-[repeat(auto-fill,minmax(5.5rem,1fr))] gap-1.5"
+                                >
+                                  {pinnedTiles}
+                                </ul>
+                              </li>,
+                            );
+                          } else {
+                            pinnedTiles.push(tile);
+                          }
+                          continue;
+                        }
                         if (item.kind === "thread") {
                           items.push(renderThreadRow(threadByKey.get(item.key)!, item.section));
                           continue;

@@ -16,10 +16,10 @@ export function resolveSidebarStageBackdropVariant(
   stageLabel: string,
   enabled = true,
 ): SidebarStageBackdropVariant | null {
-  if (!enabled) return null;
-  const normalized = stageLabel.trim().toLowerCase();
-  if (normalized === "nightly") return "nightly";
-  if (normalized === "dev") return "dev";
+  // The stage artwork is turned off in this build: the calmer sidebar has no
+  // header art. The "pill" identification mode still marks dev/nightly builds.
+  void stageLabel;
+  void enabled;
   return null;
 }
 

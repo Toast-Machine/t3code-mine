@@ -130,7 +130,7 @@ function SidebarControl() {
     // the panel), so the trigger mirrors it: both clusters sit one extra pixel
     // off their edge and the titlebar reads symmetric.
     <div
-      className="pointer-events-none fixed left-[var(--workspace-controls-left)] top-[var(--workspace-controls-top)] z-50 ml-px flex h-[var(--workspace-topbar-height)] items-center"
+      className="pointer-events-none fixed left-[calc(var(--workspace-controls-left)+0.5rem)] top-[calc(var(--workspace-controls-top)+0.5rem)] z-50 ml-px flex h-[var(--workspace-topbar-height)] items-center"
       data-sidebar-control=""
     >
       <Tooltip>
@@ -294,7 +294,9 @@ export function AppSidebarLayout({ children }: { children: ReactNode }) {
   return (
     <PanelAnimationSuppressionProvider value={panelAnimationsSuppressed}>
       <SidebarProvider
-        className="h-dvh! min-h-0!"
+        // Arc-style shell: one flat pastel surface behind the sidebar and a
+        // rounded, bordered content panel floating on it.
+        className="h-dvh! min-h-0! bg-[oklch(0.955_0.017_255)] dark:bg-[oklch(0.215_0.012_260)]"
         data-panel-animations={routePanelAnimationsActive ? "true" : "false"}
         defaultOpen
         style={sidebarProviderStyle}
@@ -302,6 +304,7 @@ export function AppSidebarLayout({ children }: { children: ReactNode }) {
         <ProjectProjectionRetention />
         <Sidebar
           side="left"
+          variant="inset"
           collapsible="offcanvas"
           data-app-sidebar=""
           role="navigation"
