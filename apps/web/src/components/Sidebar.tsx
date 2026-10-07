@@ -576,15 +576,12 @@ const tileRestSurfaceClassName =
   "bg-black/[0.045] hover:bg-black/[0.07] dark:bg-white/[0.06] dark:hover:bg-white/[0.09]";
 // Unsent work shares one look: the new-thread draft rows and thread rows
 // with unsent composer text both use this tint and pen so they read alike.
-const draftSurfaceClassName =
-  "bg-orange-50 hover:bg-orange-100/80 dark:bg-orange-300/10 dark:hover:bg-orange-300/15";
+const draftSurfaceClassName = "bg-warning/8 hover:bg-warning/12";
 const draftPenClassName = "size-3 shrink-0 text-warning-foreground";
 // Rows waiting on you are filled as a whole so they stand out at a glance:
 // pastel green for an unread finished turn, pastel amber for input or approval.
-const doneSurfaceClassName =
-  "bg-emerald-100 hover:bg-emerald-200/70 dark:bg-emerald-300/15 dark:hover:bg-emerald-300/20";
-const needsYouSurfaceClassName =
-  "bg-amber-100 hover:bg-amber-200/70 dark:bg-amber-300/15 dark:hover:bg-amber-300/20";
+const doneSurfaceClassName = "bg-success/14 hover:bg-success/20";
+const needsYouSurfaceClassName = "bg-warning/16 hover:bg-warning/22";
 
 // Structural list items — the section headers and the
 // empty-section placeholders — take part in the sortable list so they shift
@@ -1269,7 +1266,6 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: {
   // one gets its machine glyph. With no local environment (the hosted app)
   // that is every thread, which is the point: the glyph is what tells rows on
   // different machines apart.
-  const isRemote = thread.environmentId !== props.currentEnvironmentId;
 
   const detailsTooltip = (
     <SidebarThreadTooltip
@@ -1545,17 +1541,21 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: {
       aria-hidden
       className={cn(
         "min-w-0 flex-1 text-sm transition-opacity motion-reduce:transition-none",
-        shouldRecede ? "font-normal" : "font-medium",
         variant === "card"
-          ? cn(
+          ? props.isActive || needsAttentionFill
+            ? "font-medium"
+            : "font-normal"
+          : shouldRecede
+            ? "font-normal"
+            : "font-medium",
+        variant === "card"
+          ? // Every card title reads the same; only the open thread and threads
+            // waiting on you step up in weight.
+            cn(
               "truncate",
-              shouldRecede
-                ? "text-secondary-label"
-                : isUnread || isWoke || status === "input"
-                  ? "text-foreground"
-                  : status === "failed"
-                    ? "text-foreground/95"
-                    : "text-foreground/90",
+              props.isActive || needsAttentionFill
+                ? "text-foreground"
+                : "text-foreground/80 group-hover/sidebar-row:text-foreground",
             )
           : cn(
               "truncate group-focus-within/sidebar-row:text-foreground group-hover/sidebar-row:text-foreground",
@@ -1696,7 +1696,7 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: {
                   rowSurfaceClassName,
                   "flex h-[4.5rem] flex-col items-center justify-center gap-1.5 px-2",
                   props.isActive
-                    ? "ring-2 ring-sky-300 ring-inset dark:ring-sky-400/50"
+                    ? "ring-2 ring-info/45 ring-inset"
                     : !isSelected &&
                         !hasUnsentDraft &&
                         !needsAttentionFill &&
@@ -1903,8 +1903,8 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: {
       {...sortableRootProps}
       {...(fileDropHandlers ?? {})}
       className={cn(
-        // Matches the h-14 content box; the py-0.5 padding is added on top.
-        "list-none py-0.5 [content-visibility:auto] [contain-intrinsic-size:auto_56px]",
+        // Matches the h-9 content box; the py-0.5 padding is added on top.
+        "list-none py-0.5 [content-visibility:auto] [contain-intrinsic-size:auto_40px]",
         sortable?.isDragging && "relative z-20",
       )}
     >
@@ -1928,12 +1928,22 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: {
           }
         >
           {accessibleTitle}
-          {/* Calm card: title and status first, project underneath. Branch,
+          {/* One calm line: project icon, title, then status or time. Branch,
               agent, and machine details live in the hover tooltip. */}
-          <div className="relative z-10 h-14 px-(--sidebar-row-content-inset) py-2">
-            <div className="flex h-5 min-w-0 items-center gap-1.5">
+          <div className="relative z-10 flex h-9 items-center px-(--sidebar-row-content-inset)">
+            <div className="flex h-5 min-w-0 flex-1 items-center gap-2">
+              {props.project ? (
+                <ProjectFavicon project={props.project} className="size-4 shrink-0" />
+              ) : null}
               {draftIndicator}
               {title}
+              {terminalStatusIcon}
+              {prBadge ? (
+                // Metadata stays gray at rest; color is reserved for status.
+                <span className="inline-flex shrink-0 opacity-55 grayscale transition group-hover/sidebar-row:opacity-100 group-hover/sidebar-row:grayscale-0">
+                  {prBadge}
+                </span>
+              ) : null}
               {pinIndicator}
               {/* The visible state owns this slot's width: status at rest,
                   actions on hover/keyboard focus or while the popover is open. Keeping
@@ -2076,43 +2086,6 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: {
                 Regenerating title
               </span>
             ) : null}
-            <div className="mt-1 flex min-w-0 items-center gap-1.5 text-xs text-secondary-label/80">
-              {props.project ? (
-                <ProjectFavicon project={props.project} className="size-3.5 shrink-0" />
-              ) : null}
-              <span className="min-w-0 flex-1 truncate">{props.projectDisplayName ?? ""}</span>
-              {terminalStatusIcon}
-              {prBadge}
-              <span
-                aria-hidden
-                className="pointer-events-none inline-flex shrink-0 items-center gap-1 opacity-60"
-              >
-                {isRemote ? (
-                  <EnvironmentMachineIcon
-                    aria-hidden
-                    kind={props.environmentMachine}
-                    className="size-3.5"
-                  />
-                ) : null}
-                {driverKind ? (
-                  <span className="inline-flex shrink-0 items-center">
-                    <ProviderInstanceIcon
-                      driverKind={driverKind}
-                      displayName={
-                        providerEntry?.displayName ??
-                        thread.session?.providerName ??
-                        modelInstanceId
-                      }
-                      accentColor={providerEntry?.accentColor}
-                      showBadge={showInstanceBadge}
-                      // Glyph dims, badge stays saturated; offset matches the composer trigger.
-                      iconClassName="size-3.5 opacity-60"
-                      badgeClassName="right-[-0.1875rem] bottom-[-0.1875rem] h-3 min-w-3 px-0.5 text-5xs"
-                    />
-                  </span>
-                ) : null}
-              </span>
-            </div>
           </div>
           {props.jumpLabel ? <JumpHintBadge label={props.jumpLabel} /> : null}
         </TooltipTrigger>

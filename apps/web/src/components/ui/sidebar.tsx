@@ -157,7 +157,7 @@ function SidebarProvider({
       <div
         // Inset layouts opt into bg-sidebar through className.
         className={cn(
-          "group/sidebar-wrapper flex min-h-svh w-full max-sm:[--workspace-titlebar-control-size:--spacing(8)]",
+          "group/sidebar-wrapper flex min-h-svh w-full has-data-[variant=inset]:bg-sidebar-shell max-sm:[--workspace-titlebar-control-size:--spacing(8)]",
           className,
         )}
         data-sidebar-state={state}

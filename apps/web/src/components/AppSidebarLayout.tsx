@@ -294,9 +294,7 @@ export function AppSidebarLayout({ children }: { children: ReactNode }) {
   return (
     <PanelAnimationSuppressionProvider value={panelAnimationsSuppressed}>
       <SidebarProvider
-        // Arc-style shell: one flat pastel surface behind the sidebar and a
-        // rounded, bordered content panel floating on it.
-        className="h-dvh! min-h-0! bg-[oklch(0.955_0.017_255)] dark:bg-[oklch(0.215_0.012_260)]"
+        className="h-dvh! min-h-0!"
         data-panel-animations={routePanelAnimationsActive ? "true" : "false"}
         defaultOpen
         style={sidebarProviderStyle}

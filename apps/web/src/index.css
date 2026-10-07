@@ -254,6 +254,9 @@ html[data-mobile-composer-route-transition="true"]::view-transition-old(t3-mobil
   --color-message-action-foreground: var(--message-action-foreground);
   --color-message-action-hover: var(--message-action-hover);
   --color-sidebar: var(--sidebar);
+  /* Flat pastel shell behind the inset sidebar layout: the sidebar color with
+     a light wash of the info hue, so it follows every theme and dark mode. */
+  --color-sidebar-shell: color-mix(in oklab, var(--sidebar) 90%, var(--info));
   --color-sidebar-foreground: var(--contrast-sidebar-foreground);
   --color-sidebar-muted-foreground: var(--contrast-sidebar-muted-foreground);
   --color-sidebar-control-surface: var(--sidebar-control-surface);
