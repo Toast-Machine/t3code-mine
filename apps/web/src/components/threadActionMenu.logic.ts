@@ -12,6 +12,7 @@ export type ThreadActionMenuId =
   | "project-settings"
   | "pin"
   | "unpin"
+  | "change-icon"
   | "settle"
   | "unsettle"
   | "auto-settle"
@@ -84,6 +85,7 @@ export function buildThreadActionMenuItems(
           state.isPinned
             ? { id: "unpin" as const, label: "Unpin thread", icon: "pin-off" }
             : { id: "pin" as const, label: "Pin thread", icon: "pin" },
+          ...(state.isPinned ? [{ id: "change-icon" as const, label: "Change icon…" }] : []),
         ]
       : []),
     // Both lifecycle actions stay available on pinned threads: settling

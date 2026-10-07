@@ -2521,6 +2521,7 @@ html[data-palette="blueberry"]:not([data-palette=""])
   [data-sidebar-state="expanded"]
   [data-sidebar-control] {
   --contrast-sidebar-foreground: #ffffff;
+  --muted: rgb(255 255 255 / 0.12);
   --contrast-foreground: #ffffff;
   --contrast-muted-foreground: rgb(255 255 255 / 0.62);
   --contrast-secondary-label: rgb(255 255 255 / 0.62);
@@ -2564,6 +2565,7 @@ html[data-palette="forest"]:not([data-palette=""])
   [data-sidebar-state="expanded"]
   [data-sidebar-control] {
   --contrast-sidebar-foreground: #ffffff;
+  --muted: rgb(255 255 255 / 0.12);
   --contrast-foreground: #ffffff;
   --contrast-muted-foreground: rgb(255 255 255 / 0.62);
   --contrast-secondary-label: rgb(255 255 255 / 0.62);
@@ -2607,6 +2609,7 @@ html[data-palette="rosewood"]:not([data-palette=""])
   [data-sidebar-state="expanded"]
   [data-sidebar-control] {
   --contrast-sidebar-foreground: #ffffff;
+  --muted: rgb(255 255 255 / 0.12);
   --contrast-foreground: #ffffff;
   --contrast-muted-foreground: rgb(255 255 255 / 0.62);
   --contrast-secondary-label: rgb(255 255 255 / 0.62);
@@ -2650,6 +2653,7 @@ html[data-palette="plum"]:not([data-palette=""])
   [data-sidebar-state="expanded"]
   [data-sidebar-control] {
   --contrast-sidebar-foreground: #ffffff;
+  --muted: rgb(255 255 255 / 0.12);
   --contrast-foreground: #ffffff;
   --contrast-muted-foreground: rgb(255 255 255 / 0.62);
   --contrast-secondary-label: rgb(255 255 255 / 0.62);
@@ -2693,6 +2697,7 @@ html[data-palette="deepteal"]:not([data-palette=""])
   [data-sidebar-state="expanded"]
   [data-sidebar-control] {
   --contrast-sidebar-foreground: #ffffff;
+  --muted: rgb(255 255 255 / 0.12);
   --contrast-foreground: #ffffff;
   --contrast-muted-foreground: rgb(255 255 255 / 0.62);
   --contrast-secondary-label: rgb(255 255 255 / 0.62);
@@ -2773,4 +2778,14 @@ html[data-palette="deepteal"]:not([data-palette=""]) [data-app-sidebar] {
   --color-teal-600: var(--color-teal-300);
   --color-violet-600: var(--color-violet-300);
   --color-yellow-600: var(--color-yellow-300);
+}
+
+/* Split buttons in the header: a short, soft divider instead of a full-height line. */
+html[data-palette]:not([data-palette=""])
+  [data-chat-header]
+  [data-slot="group"]
+  > [data-slot="separator"] {
+  align-self: center;
+  height: 55%;
+  background-color: color-mix(in oklab, var(--foreground) 14%, transparent);
 }
