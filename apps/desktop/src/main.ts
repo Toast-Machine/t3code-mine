@@ -67,6 +67,9 @@ import * as DesktopWindow from "./window/DesktopWindow.ts";
 import * as DesktopWslBackend from "./wsl/DesktopWslBackend.ts";
 import * as DesktopWslEnvironment from "./wsl/DesktopWslEnvironment.ts";
 import * as DesktopWslServerTree from "./wsl/DesktopWslServerTree.ts";
+import { quitIfAnotherT3CodeIsRunning } from "./otherInstanceGuard.ts";
+
+quitIfAnotherT3CodeIsRunning();
 
 const desktopEnvironmentLayer = Layer.unwrap(
   Effect.gen(function* () {
