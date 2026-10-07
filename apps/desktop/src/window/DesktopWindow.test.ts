@@ -785,10 +785,13 @@ describe("DesktopWindow", () => {
           yield* desktopWindow.zoomMain(direction);
           const position = fakeWindow.setWindowButtonPosition.mock.lastCall?.[0];
           assert.isDefined(position);
-          // The 14-point native buttons should share the zoomed 52px header's center.
-          const headerCenter = 26 * fakeWindow.window.webContents.getZoomFactor();
+          // The 14-point native buttons share the center of the zoomed 52px header,
+          // which sits below the inset layout's 8px margin, and center in the
+          // 72px app rail (the three buttons span 54 points).
+          const zoom = fakeWindow.window.webContents.getZoomFactor();
+          const headerCenter = (26 + 8) * zoom;
           assert.isAtMost(Math.abs(position.y + 7 - headerCenter), 0.5);
-          assert.equal(position.x, 16);
+          assert.isAtMost(Math.abs(position.x + 27 - 36 * zoom), 0.5);
         }
 
         fakeWindow.isFullScreen.mockReturnValue(true);
