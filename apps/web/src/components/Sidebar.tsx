@@ -120,8 +120,8 @@ import {
 } from "../sidebarProjectGrouping";
 import { legacyProjectCwdPreferenceKey, useUiStateStore } from "../uiStateStore";
 import { usePinIcon } from "../pinIcons";
-import { PinIconDialog } from "./PinIconDialog";
-import { pinLineIcon } from "./pinLineIcons";
+import { PinIconPicker } from "./PinIconPicker";
+import { PIN_ICON_COLORS, pinLineIcon } from "./pinLineIcons";
 import {
   getThreadKeysToDeselectAfterDelete,
   useThreadSelectionStore,
@@ -1233,7 +1233,7 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: {
   // switching sidebars must not light up every historical thread as unread.
   const isUnread = hasUnseenCompletion({ ...thread, lastVisitedAt });
   const pinEmoji = usePinIcon(threadKey);
-  const PinLineIcon = pinEmoji === null ? null : pinLineIcon(pinEmoji);
+  const pinLine = pinEmoji === null ? null : pinLineIcon(pinEmoji);
   const markThreadUnread = useUiStateStore((state) => state.markThreadUnread);
   const markThreadVisited = useUiStateStore((state) => state.markThreadVisited);
   const canToggleRead = thread.latestTurn?.completedAt != null;
@@ -1770,8 +1770,16 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: {
             }
           >
             {accessibleTitle}
-            {PinLineIcon !== null ? (
-              <PinLineIcon aria-hidden className="size-4 shrink-0 text-sidebar-foreground/85" />
+            {pinLine !== null ? (
+              <pinLine.Icon
+                aria-hidden
+                className={cn(
+                  "size-4 shrink-0",
+                  pinLine.color === null
+                    ? "text-sidebar-foreground/85"
+                    : PIN_ICON_COLORS[pinLine.color],
+                )}
+              />
             ) : pinEmoji !== null ? (
               <span aria-hidden className="text-base leading-none">
                 {pinEmoji}
@@ -4345,7 +4353,7 @@ export default function Sidebar() {
     ],
   );
 
-  const [pinIconTarget, setPinIconTarget] = useState<{ key: string; title: string } | null>(null);
+  const [pinIconTarget, setPinIconTarget] = useState<string | null>(null);
   const handleThreadContextMenu = useCallback(
     (threadRef: ScopedThreadRef, position: { x: number; y: number }) => {
       void (async () => {
@@ -4486,7 +4494,7 @@ export default function Sidebar() {
             attemptUnpin(threadRef);
             return;
           case "change-icon":
-            setPinIconTarget({ key: threadKey, title: thread.title });
+            setPinIconTarget(threadKey);
             return;
           case "auto-settle:enabled":
           case "auto-settle:disabled": {
@@ -5307,11 +5315,7 @@ export default function Sidebar() {
         </SidebarGroup>
       </SidebarContent>
       <SidebarChromeFooter />
-      <PinIconDialog
-        threadKey={pinIconTarget?.key ?? null}
-        threadTitle={pinIconTarget?.title ?? ""}
-        onClose={() => setPinIconTarget(null)}
-      />
+      <PinIconPicker threadKey={pinIconTarget} onClose={() => setPinIconTarget(null)} />
     </>
   );
 }
