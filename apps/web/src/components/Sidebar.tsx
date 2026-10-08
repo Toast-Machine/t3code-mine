@@ -298,6 +298,34 @@ function observeInboxReturns(threads: readonly EnvironmentThreadShell[] | null):
   lastWorkingThreadKeys = working;
 }
 
+// When this client saw each thread start working. A sent message flips the
+// thread to working before the server stamps the new turn, and sorting by the
+// previous turn's time would land it at the bottom of Working, then jump it
+// to the top once the stamp arrives.
+let lastSeenWorkingKeys: ReadonlySet<string> | null = null;
+const observedWorkingStarts = new Map<string, number>();
+
+/** Stamps threads that started working since the last call. The first call
+    only takes a baseline, so mounting never reshuffles the shelf. */
+function observeWorkingStarts(threads: readonly EnvironmentThreadShell[]): void {
+  const working = new Set<string>();
+  for (const thread of threads) {
+    if (isSidebarThreadWorking(thread)) {
+      working.add(scopedThreadKey(scopeThreadRef(thread.environmentId, thread.id)));
+    }
+  }
+  for (const key of observedWorkingStarts.keys()) {
+    if (!working.has(key)) observedWorkingStarts.delete(key);
+  }
+  if (lastSeenWorkingKeys !== null) {
+    const now = Date.now();
+    for (const key of working) {
+      if (!lastSeenWorkingKeys.has(key)) observedWorkingStarts.set(key, now);
+    }
+  }
+  lastSeenWorkingKeys = working;
+}
+
 function compactSidebarTimeLabel(label: string): string {
   if (label === "just now") return "now";
   return label.endsWith(" ago") ? label.slice(0, -4) : label;
@@ -2712,6 +2740,7 @@ export default function Sidebar() {
           scopedProjectKeys.has(`${thread.environmentId}:${thread.projectId}`)),
     );
     observeInboxReturns(workingShelfEnabled ? threads : null);
+    observeWorkingStarts(threads);
     const pinned: EnvironmentThreadShell[] = [];
     const active: EnvironmentThreadShell[] = [];
     const working: EnvironmentThreadShell[] = [];
@@ -2801,7 +2830,9 @@ export default function Sidebar() {
               getId: (thread) => scopedThreadKey(scopeThreadRef(thread.environmentId, thread.id)),
             }),
       // Newest work first, by the same clock as the inbox.
-      workingThreads: sortInboxThreadsByReturn(working),
+      workingThreads: sortInboxThreadsByReturn(working, (thread) =>
+        observedWorkingStarts.get(scopedThreadKey(scopeThreadRef(thread.environmentId, thread.id))),
+      ),
       // Soonest wake first: "what comes back next" is the shelf's question.
       snoozedThreads: snoozed.toSorted(
         (left, right) =>
@@ -3648,17 +3679,26 @@ export default function Sidebar() {
     const pinnedRows = rowsOf(pinnedThreads, "pinned");
     items.push(...pinnedRows);
     items.push({ kind: "marker", marker: "pinned-divider" });
+    // A collapsed group keeps only the open thread, like the Snoozed and
+    // Settled shelves, and leaves the list here so row motion sees it.
+    const unlessCollapsed = (list: readonly EnvironmentThreadShell[], group: string) =>
+      collapsedGroups.has(group)
+        ? list.filter(
+            (thread) =>
+              scopedThreadKey(scopeThreadRef(thread.environmentId, thread.id)) === routeThreadKey,
+          )
+        : list;
     // Grouped by what the thread needs from you: needs you, then working,
     // then everything else that is open.
     const needsYou = activeThreads.filter(threadNeedsYou);
     const open = activeThreads.filter((thread) => !threadNeedsYou(thread));
-    items.push(...rowsOf(needsYou, "active"));
+    items.push(...rowsOf(unlessCollapsed(needsYou, "needs-you"), "active"));
     if (workingThreads.length > 0) {
       items.push({ kind: "marker", marker: "working-header" });
-      items.push(...rowsOf(workingThreads, "working"));
+      items.push(...rowsOf(unlessCollapsed(workingThreads, "working"), "working"));
     }
     items.push({ kind: "marker", marker: "active-placeholder" });
-    items.push(...rowsOf(open, "active"));
+    items.push(...rowsOf(unlessCollapsed(open, "open"), "active"));
     if (snoozedThreads.length > 0) {
       items.push({ kind: "marker", marker: "snoozed-header" });
       items.push(...rowsOf(visibleSnoozedThreads, "snoozed"));
@@ -3670,8 +3710,10 @@ export default function Sidebar() {
     return items;
   }, [
     activeThreads,
+    collapsedGroups,
     pinnedThreads,
     renderedSettledThreads,
+    routeThreadKey,
     settledThreads.length,
     snoozedThreads.length,
     visibleSnoozedThreads,
@@ -3694,11 +3736,9 @@ export default function Sidebar() {
   const shellsBootstrapped = useAllEnvironmentShellsBootstrapped();
   const sidebarDataSettled =
     shellsBootstrapped && threads.every((thread) => serverConfigs.has(thread.environmentId));
-  const [sidebarMotionReady, setSidebarMotionReady] = useState(false);
-  useEffect(() => {
-    if (sidebarDataSettled) setSidebarMotionReady(true);
-  }, [sidebarDataSettled]);
-  const listMotionPaused = dragState !== null || !sidebarMotionReady || !sidebarDataSettled;
+  // Whether the data was already settled at the previous motion pass.
+  const sidebarDataSettledRef = useRef(false);
+  const listMotionPaused = dragState !== null || !sidebarDataSettled;
   // Every shell event rebuilds sidebarListItems, but rows only move when the
   // rendered order or a row's section changes. Keying the motion pass on that
   // keeps ordinary updates from forcing a layout read and animating rows
@@ -3717,7 +3757,9 @@ export default function Sidebar() {
     // Later thread actions can animate while writes settle.
     // Draft navigation can reveal a frozen row without changing the draft count.
     void sidebarListOrderKey;
-    listMotionRef.current?.update(!listMotionPaused && sidebarListHasRows);
+    const settledBefore = sidebarDataSettledRef.current;
+    sidebarDataSettledRef.current = sidebarDataSettled;
+    listMotionRef.current?.update(!listMotionPaused && settledBefore && sidebarListHasRows);
   }, [
     listMotionPaused,
     routeDraftIdForRows,
@@ -5117,36 +5159,7 @@ export default function Sidebar() {
                       let pinnedTiles: ReactNode[] | null = null;
                       const needsYouCount = activeThreads.filter(threadNeedsYou).length;
                       const openCount = activeThreads.length - needsYouCount;
-                      let needsYouLabelShown = false;
                       for (const item of sidebarListItems) {
-                        if (
-                          item.kind === "thread" &&
-                          item.section === "active" &&
-                          !needsYouLabelShown &&
-                          threadNeedsYou(threadByKey.get(item.key)!)
-                        ) {
-                          needsYouLabelShown = true;
-                          items.push(
-                            <SidebarGroupLabel
-                              key="needs-you-label"
-                              label="Needs you"
-                              count={needsYouCount}
-                              expanded={!collapsedGroups.has("needs-you")}
-                              onToggle={() => toggleGroup("needs-you")}
-                            />,
-                          );
-                        }
-                        if (item.kind === "thread") {
-                          const group =
-                            item.section === "active"
-                              ? threadNeedsYou(threadByKey.get(item.key)!)
-                                ? "needs-you"
-                                : "open"
-                              : item.section === "working"
-                                ? "working"
-                                : null;
-                          if (group !== null && collapsedGroups.has(group)) continue;
-                        }
                         if (item.kind === "thread" && item.section === "pinned") {
                           const tile = renderThreadRow(threadByKey.get(item.key)!, item.section);
                           if (pinnedTiles === null) {
@@ -5171,6 +5184,18 @@ export default function Sidebar() {
                           case "pinned-header":
                             break;
                           case "pinned-divider":
+                            // Needs-you rows follow the divider directly.
+                            if (needsYouCount > 0) {
+                              items.push(
+                                <SidebarGroupLabel
+                                  key="needs-you-label"
+                                  label="Needs you"
+                                  count={needsYouCount}
+                                  expanded={!collapsedGroups.has("needs-you")}
+                                  onToggle={() => toggleGroup("needs-you")}
+                                />,
+                              );
+                            }
                             break;
                           case "active-placeholder":
                             if (openCount > 0) {
