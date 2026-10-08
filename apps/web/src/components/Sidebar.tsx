@@ -806,8 +806,8 @@ function SidebarSectionHeader(props: {
   );
 }
 
-// One unsent draft session the user has invested content in. Two lines,
-// nothing else: project name, then the typed prompt. All the draft's
+// One unsent draft session the user has invested content in, shaped like a
+// thread card: the typed prompt, then "Unsent draft · project". All the draft's
 // settings (model, env mode, branch, worktree) still travel with it —
 // clicking is a plain navigation to /draft/$draftId, which touches nothing.
 // While the draft is open the row renders a frozen snapshot (see
@@ -884,14 +884,19 @@ const SidebarDraftRow = memo(function SidebarDraftRow(props: {
         onKeyDown={handleKeyDown}
       >
         <span className="sr-only">{preview}</span>
-        <div className="relative z-10 h-[4.875rem] px-(--sidebar-row-content-inset) py-(--sidebar-content-inset)">
-          <div className="flex h-5 min-w-0 items-center gap-1.5">
-            <SquarePenIcon aria-hidden className={draftPenClassName} />
+        {/* Same two lines as a thread card: the prompt where the title goes,
+            then a gray line naming it a draft and its project. */}
+        <div className="relative z-10 flex h-12 flex-col justify-center gap-0.5 px-(--sidebar-row-content-inset)">
+          <div className="flex h-5 min-w-0 items-center gap-2">
             {props.project ? (
               <ProjectFavicon project={props.project} className="size-4 shrink-0" />
             ) : null}
-            <span className="min-w-0 flex-1 truncate text-xs font-medium text-secondary-label">
-              {props.projectDisplayName}
+            <SquarePenIcon aria-hidden className={draftPenClassName} />
+            <span
+              aria-hidden
+              className="min-w-0 flex-1 truncate text-sm font-semibold text-sidebar-foreground/90"
+            >
+              {preview}
             </span>
             <span className="ml-auto flex h-5 min-w-5 shrink-0 items-center justify-end">
               <Tooltip>
@@ -901,9 +906,9 @@ const SidebarDraftRow = memo(function SidebarDraftRow(props: {
                       type="button"
                       aria-label="Discard draft"
                       onClick={handleDiscard}
-                      className="pointer-events-none inline-flex cursor-pointer items-center rounded-md bg-transparent px-1 text-muted-foreground opacity-0 transition-opacity hover:text-foreground focus-visible:pointer-events-auto focus-visible:opacity-100 group-hover/sidebar-row:pointer-events-auto group-hover/sidebar-row:opacity-100"
+                      className="pointer-events-none inline-flex cursor-pointer items-center rounded-md bg-transparent px-1.5 text-muted-foreground opacity-0 transition-opacity hover:text-foreground focus-visible:pointer-events-auto focus-visible:opacity-100 group-hover/sidebar-row:pointer-events-auto group-hover/sidebar-row:opacity-100"
                     >
-                      <XIcon className="size-3" />
+                      <XIcon className="size-3.5" />
                     </button>
                   }
                 />
@@ -911,8 +916,13 @@ const SidebarDraftRow = memo(function SidebarDraftRow(props: {
               </Tooltip>
             </span>
           </div>
-          <div aria-hidden className="mt-0.5 truncate text-sm font-medium text-foreground/90">
-            {preview}
+          <div
+            aria-hidden
+            className="flex h-4 min-w-0 items-center pl-6 text-xs text-sidebar-muted-foreground"
+          >
+            <span className="min-w-0 flex-1 truncate">
+              Unsent draft{props.projectDisplayName ? ` · ${props.projectDisplayName}` : ""}
+            </span>
           </div>
         </div>
       </div>
