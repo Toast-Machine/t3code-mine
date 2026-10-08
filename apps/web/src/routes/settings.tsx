@@ -10,6 +10,7 @@ import { useNavigateToMainApp } from "../components/sidebar/mainAppLocation";
 import { WorkspacePageHeader } from "../components/WorkspacePageHeader";
 import { isElectron } from "../env";
 import { useEscapeToGoBack } from "../hooks/useNavigateBack";
+import { useRenderedPathname } from "../hooks/useRenderedPathname";
 import {
   SettingsScopeProvider,
   useSettingsScope,
@@ -111,7 +112,7 @@ function SettingsScopeBoundary({ pathname, children }: { pathname: string; child
 }
 
 function SettingsContentLayout() {
-  const location = useLocation();
+  const pathname = useRenderedPathname();
   const navigateToMainApp = useNavigateToMainApp();
   useEscapeToGoBack(navigateToMainApp);
   const { search } = useSettingsScope();
@@ -122,8 +123,8 @@ function SettingsContentLayout() {
       <div className="flex min-h-0 min-w-0 flex-1 flex-col bg-background text-foreground">
         <WorkspacePageHeader electron={isElectron}>
           <div className="flex w-full items-center gap-3">
-            <SettingsBreadcrumb pathname={location.pathname} />
-            {location.pathname === "/settings/general" ? (
+            <SettingsBreadcrumb pathname={pathname} />
+            {pathname === "/settings/general" ? (
               <div className="ms-auto flex shrink-0 items-center">
                 <RestoreDeviceDefaultsButton
                   onRestored={() => setRestoreSignal((value) => value + 1)}
@@ -137,7 +138,7 @@ function SettingsContentLayout() {
           key={`${JSON.stringify(search)}:${restoreSignal}`}
           className="min-h-0 flex flex-1 flex-col"
         >
-          <SettingsScopeBoundary pathname={location.pathname}>
+          <SettingsScopeBoundary pathname={pathname}>
             <Outlet />
           </SettingsScopeBoundary>
         </div>
@@ -149,7 +150,7 @@ function SettingsContentLayout() {
 function SettingsRouteLayout() {
   const rawSearch = Route.useSearch();
   const navigate = Route.useNavigate();
-  const pathname = useLocation({ select: (location) => location.pathname });
+  const pathname = useRenderedPathname();
   return (
     <SettingsScopeProvider
       search={rawSearch}

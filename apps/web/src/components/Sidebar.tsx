@@ -138,6 +138,7 @@ import { useEnvironments, usePrimaryEnvironmentId } from "../state/environments"
 import {
   readThreadShell,
   useAllEnvironmentProjectSnapshotsReady,
+  useAllEnvironmentShellsBootstrapped,
   useProjects,
   useThreadShells,
 } from "../state/entities";
@@ -1935,8 +1936,9 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: {
       {...sortableRootProps}
       {...(fileDropHandlers ?? {})}
       className={cn(
-        // Matches the h-12 content box; the py-0.5 padding is added on top.
-        "list-none py-0.5 [content-visibility:auto] [contain-intrinsic-size:auto_52px]",
+        // Matches the h-12 row; the py-0.5 padding is added on top. A larger
+        // placeholder makes every remounted list collapse a few pixels per row.
+        "list-none py-0.5 [content-visibility:auto] [contain-intrinsic-size:auto_48px]",
         sortable?.isDragging && "relative z-20",
       )}
     >
@@ -3684,7 +3686,19 @@ export default function Sidebar() {
       cancelThreadDrag();
     }
   }, [cancelThreadDrag, dragState, sidebarListItems]);
-  const listMotionPaused = dragState !== null;
+  // On first load, shells arrive before each server's capabilities, and those
+  // capabilities decide which section a row belongs to. Motion waits until
+  // both have landed so startup sorting snaps into place instead of shuffling.
+  // The commit that completes the data is itself a re-sort, so motion starts
+  // only on the commit after it.
+  const shellsBootstrapped = useAllEnvironmentShellsBootstrapped();
+  const sidebarDataSettled =
+    shellsBootstrapped && threads.every((thread) => serverConfigs.has(thread.environmentId));
+  const [sidebarMotionReady, setSidebarMotionReady] = useState(false);
+  useEffect(() => {
+    if (sidebarDataSettled) setSidebarMotionReady(true);
+  }, [sidebarDataSettled]);
+  const listMotionPaused = dragState !== null || !sidebarMotionReady || !sidebarDataSettled;
   // Every shell event rebuilds sidebarListItems, but rows only move when the
   // rendered order or a row's section changes. Keying the motion pass on that
   // keeps ordinary updates from forcing a layout read and animating rows

@@ -73,6 +73,7 @@ import {
   useTheme,
 } from "../../hooks/useTheme";
 import { useLocalStorage } from "../../hooks/useLocalStorage";
+import { useDelayedStatus } from "../../hooks/useDelayedStatus";
 import {
   useScopedSettings,
   useScopedSettingsMixed,
@@ -3300,6 +3301,9 @@ export function ArchivedThreadsPanel() {
     isLoading: isLoadingArchive,
     refresh: refreshArchivedThreads,
   } = useArchivedThreadSnapshots(scope.environmentIds);
+  // A fast load (the common local case) would flash the loading row for a
+  // frame before the list replaces it; only show it once loading lingers.
+  const showArchiveLoading = useDelayedStatus("archive", isLoadingArchive ? true : null) === true;
 
   const archivedGroups = useMemo(() => {
     const selectedProjectKeys =
@@ -3402,7 +3406,9 @@ export function ArchivedThreadsPanel() {
 
   return (
     <SettingsPageContainer>
-      {archivedGroups.length === 0 ? (
+      {archivedGroups.length === 0 &&
+      isLoadingArchive &&
+      !showArchiveLoading ? null : archivedGroups.length === 0 ? (
         <SettingsSection
           id={isLoadingArchive ? undefined : searchableSetting("archive").id}
           title={searchableSetting("archive").title}

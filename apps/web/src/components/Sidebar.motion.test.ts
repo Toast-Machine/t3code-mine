@@ -67,9 +67,19 @@ class TestRow {
 
 function fixture(rows: TestRow[]) {
   const media = { matches: false };
+  let resized: (() => void) | undefined;
+  class TestResizeObserver {
+    constructor(callback: () => void) {
+      resized = callback;
+    }
+    observe() {}
+    disconnect() {}
+  }
   const parent = {
     children: rows,
-    ownerDocument: { defaultView: { matchMedia: () => media } },
+    ownerDocument: {
+      defaultView: { matchMedia: () => media, ResizeObserver: TestResizeObserver },
+    },
     getBoundingClientRect: () => ({ top: 0 }),
     append(node: TestRow) {
       parent.children.push(node);
@@ -91,7 +101,7 @@ function fixture(rows: TestRow[]) {
   }
   layout(rows);
   const motion = createSidebarListMotion(parent as unknown as HTMLUListElement);
-  return { motion, layout, media, parent };
+  return { motion, layout, media, parent, resize: () => resized?.() };
 }
 
 function expectMove(row: TestRow, offset: number) {
@@ -105,6 +115,23 @@ beforeEach(() => vi.stubGlobal("HTMLElement", TestRow));
 afterEach(() => vi.unstubAllGlobals());
 
 describe("sidebar list motion", () => {
+  it("does not replay height drift that happened between order changes", () => {
+    const [a, b] = [new TestRow("a", 52), new TestRow("b", 52)];
+    const { motion, layout, resize } = fixture([a, b]);
+    motion.update(true);
+
+    // Rows settle their real height after mount without an order change.
+    a.offsetHeight = b.offsetHeight = 82;
+    layout([a, b]);
+    resize();
+
+    const settled = new TestRow("settled", 36);
+    layout([a, b, settled]);
+    motion.update(true);
+    expect(a.animate).not.toHaveBeenCalled();
+    expect(b.animate).not.toHaveBeenCalled();
+  });
+
   it("moves a retained Active row into Settled with its displaced peers", () => {
     const pinnedHeader = new TestRow("Pinned", 0);
     const pinned = new TestRow("pin");

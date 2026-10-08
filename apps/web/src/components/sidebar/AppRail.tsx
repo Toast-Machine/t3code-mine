@@ -84,8 +84,15 @@ export function AppRail() {
   // switching pages never renders an empty frame while code downloads.
   useEffect(() => {
     const preload = () => {
-      for (const id of RAIL_ROUTE_IDS) {
-        void Promise.resolve(router.loadRouteChunk(router.routesById[id])).catch(() => {});
+      // Settings pages switch from the settings nav, not the rail, so load
+      // them all: a missing chunk leaves the old page up while the new one loads.
+      const settingsIds = Object.keys(router.routesById).filter((id) =>
+        id.startsWith("/settings/"),
+      );
+      for (const id of [...RAIL_ROUTE_IDS, ...settingsIds]) {
+        void Promise.resolve(
+          router.loadRouteChunk(router.routesById[id as keyof typeof router.routesById]),
+        ).catch(() => {});
       }
     };
     const idle = window.requestIdleCallback?.(preload) ?? window.setTimeout(preload, 1500);
@@ -94,9 +101,16 @@ export function AppRail() {
       else window.clearTimeout(idle);
     };
   }, [router]);
-  const pullRequestsSupported = environments.some(
-    (environment) => environment.serverConfig?.environment.capabilities.pullRequests === true,
-  );
+  // Capabilities arrive after first paint. Keep the button while they are
+  // unknown and drop it only once every environment has said no, so startup
+  // never pops it in and pushes the rest of the rail down.
+  const pullRequestsSupported =
+    environments.length === 0 ||
+    environments.some(
+      (environment) =>
+        !environment.serverConfig ||
+        environment.serverConfig.environment.capabilities.pullRequests === true,
+    );
   const page = pathname.startsWith("/settings")
     ? "settings"
     : pathname.startsWith("/skills")

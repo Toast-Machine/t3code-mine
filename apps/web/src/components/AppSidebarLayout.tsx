@@ -26,6 +26,7 @@ import { resolveThreadRouteRef } from "../threadRoutes";
 import { cn, isMacPlatform } from "../lib/utils";
 import { primaryServerKeybindingsAtom } from "../state/server";
 import { useEnvironmentIdentificationMode, useLegacySidebarEnabled } from "../hooks/useSettings";
+import { useRenderedPathname } from "../hooks/useRenderedPathname";
 import {
   PanelAnimationSuppressionProvider,
   usePanelAnimationSettings,
@@ -290,7 +291,8 @@ export function AppSidebarLayout({ children }: { children: ReactNode }) {
     usePanelAnimationSettings();
   // Settings routes show the settings nav in place of whichever thread
   // sidebar is active.
-  const pathname = useLocation({ select: (location) => location.pathname });
+  // The rendered page, so the page sidebar swaps in the same frame as content.
+  const pathname = useRenderedPathname();
   const panelAnimationsSuppressed = usePanelNavigationSuppression(pathname);
   const routePanelAnimationsActive = panelAnimationsActive && !panelAnimationsSuppressed;
   const pageSidebar = resolvePageSidebar(pathname, legacySidebarEnabled);

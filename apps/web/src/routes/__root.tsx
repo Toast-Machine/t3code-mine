@@ -72,7 +72,13 @@ import {
   primaryServerConfigEventAtom,
   primaryServerWelcomeAtom,
 } from "../state/server";
-import { readProject, setActiveEnvironmentId, useActiveEnvironmentId } from "../state/entities";
+import {
+  readProject,
+  setActiveEnvironmentId,
+  useActiveEnvironmentId,
+  useAllEnvironmentShellsBootstrapped,
+} from "../state/entities";
+import { releaseBootSplash } from "../bootSplash";
 import {
   createKeybindingsUpdateToastController,
   type KeybindingsUpdateToastController,
@@ -157,6 +163,11 @@ function RootRouteView() {
       window.cancelAnimationFrame(frame);
     };
   }, [pathname]);
+
+  // Pages outside the workspace have no startup data to wait for.
+  const workspaceRoute =
+    primaryEnvironmentAuthenticated && pathname !== "/pair" && pathname !== "/connect";
+  useReleaseBootSplash(!workspaceRoute);
 
   if (pathname === "/pair" || pathname === "/connect") {
     return (
@@ -252,6 +263,24 @@ function RootRouteView() {
       </AnchoredToastProvider>
     </ToastProvider>
   );
+}
+
+/** Uncovers the startup splash once the workspace's first data has landed:
+ * every environment's shell snapshot and the primary server's config, which
+ * together decide what the sidebar and thread view show. */
+function useReleaseBootSplash(skip: boolean) {
+  const bootstrapped = useAllEnvironmentShellsBootstrapped();
+  const serverConfig = useAtomValue(primaryServerConfigAtom);
+  const serverWelcome = useAtomValue(primaryServerWelcomeAtom);
+  const pathname = useLocation({ select: (location) => location.pathname });
+  // EventRouter moves a fresh "/" into the welcome's bootstrap thread; wait for
+  // the welcome and that hop so the empty start page never flashes first.
+  const bootstrapHopPending =
+    pathname === "/" && (serverWelcome === null || Boolean(serverWelcome.bootstrapThreadId));
+  const ready = skip || (bootstrapped && serverConfig !== null && !bootstrapHopPending);
+  useEffect(() => {
+    if (ready) releaseBootSplash();
+  }, [ready]);
 }
 
 /** Follows the palette the primary environment's machine publishes, if any. */
