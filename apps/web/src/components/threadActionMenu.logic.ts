@@ -85,7 +85,9 @@ export function buildThreadActionMenuItems(
           state.isPinned
             ? { id: "unpin" as const, label: "Unpin thread", icon: "pin-off" }
             : { id: "pin" as const, label: "Pin thread", icon: "pin" },
-          ...(state.isPinned ? [{ id: "change-icon" as const, label: "Change icon…" }] : []),
+          ...(state.isPinned
+            ? [{ id: "change-icon" as const, label: "Change icon…", icon: "smile" }]
+            : []),
         ]
       : []),
     // Both lifecycle actions stay available on pinned threads: settling

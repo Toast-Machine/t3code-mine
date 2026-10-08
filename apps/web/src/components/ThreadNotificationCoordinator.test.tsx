@@ -63,6 +63,7 @@ vi.mock("../hooks/useSettings", () => ({
   ) => select({ notificationMode: state.mode, inAppNotificationsEnabled: state.inApp }),
   getClientSettings: () => ({ notificationMode: state.mode }),
 }));
+vi.mock("./needsYouCount", () => ({ useNeedsYouCount: () => 0 }));
 vi.mock("../state/environments", () => ({
   useEnvironments: () => ({ environments: [{ environmentId: "env-1" }] }),
 }));

@@ -20,6 +20,7 @@ export const SF_SYMBOL_BY_MENU_ICON: Readonly<Record<string, string>> = {
   play: "play",
   "refresh-cw": "arrow.clockwise",
   settings: "gearshape",
+  smile: "face.smiling",
   timer: "timer",
   trash: "trash",
 };
