@@ -1653,6 +1653,46 @@ const makeProjectionSnapshotQuery = Effect.gen(function* () {
       `,
   });
 
+  // Personal build: the sidebar's message preview — the start of each
+  // thread's latest finished assistant reply. Served by the
+  // (thread_id, created_at) message index; settled threads render without a
+  // preview, so the snapshot skips them.
+  const latestAssistantPreviewSql = sql`
+    SELECT substr(messages.text, 1, 240)
+    FROM projection_thread_messages messages
+    WHERE messages.thread_id = threads.thread_id
+      AND messages.role = 'assistant'
+      AND messages.is_streaming = 0
+    ORDER BY messages.created_at DESC, messages.message_id DESC
+    LIMIT 1
+  `;
+  const AssistantPreviewRowSchema = Schema.Struct({
+    threadId: ThreadId,
+    preview: Schema.NullOr(Schema.String),
+  });
+  const listUnsettledAssistantPreviewRows = SqlSchema.findAll({
+    Request: Schema.Void,
+    Result: AssistantPreviewRowSchema,
+    execute: () =>
+      sql`
+        SELECT threads.thread_id AS "threadId", (${latestAssistantPreviewSql}) AS "preview"
+        FROM projection_threads threads
+        WHERE threads.deleted_at IS NULL
+          AND threads.archived_at IS NULL
+          ${unsettledThreadsFilter(true)}
+      `,
+  });
+  const getAssistantPreviewRowByThread = SqlSchema.findOneOption({
+    Request: ThreadIdLookupInput,
+    Result: AssistantPreviewRowSchema,
+    execute: ({ threadId }) =>
+      sql`
+        SELECT threads.thread_id AS "threadId", (${latestAssistantPreviewSql}) AS "preview"
+        FROM projection_threads threads
+        WHERE threads.thread_id = ${threadId}
+      `,
+  });
+
   const getThreadSessionRowByThread = SqlSchema.findOneOption({
     Request: ThreadIdLookupInput,
     Result: ProjectionThreadSessionDbRowSchema,
@@ -2718,11 +2758,27 @@ pending_approval_requests AS (
               ),
             ),
           ),
+          listUnsettledAssistantPreviewRows(undefined).pipe(
+            Effect.mapError(
+              toPersistenceSqlOrDecodeError(
+                "ProjectionSnapshotQuery.getShellSnapshot:listAssistantPreviews:query",
+                "ProjectionSnapshotQuery.getShellSnapshot:listAssistantPreviews:decodeRows",
+              ),
+            ),
+          ),
         ]),
       )
       .pipe(
         Effect.flatMap(
-          ([projectRows, threadRows, sessionRows, pullRequestRows, latestTurnRows, stateRows]) =>
+          ([
+            projectRows,
+            threadRows,
+            sessionRows,
+            pullRequestRows,
+            latestTurnRows,
+            stateRows,
+            assistantPreviewRows,
+          ]) =>
             Effect.gen(function* () {
               let updatedAt: string | null = null;
               for (const row of projectRows) {
@@ -2756,6 +2812,9 @@ pending_approval_requests AS (
                 sessionRows.map((row) => [row.threadId, mapSessionRow(row)] as const),
               );
               const pullRequestsByThread = groupPullRequestRowsByThread(pullRequestRows);
+              const assistantPreviewByThread = new Map(
+                assistantPreviewRows.map((row) => [row.threadId, row.preview] as const),
+              );
 
               // Built from schema-decoded rows, so no second decode here. The HTTP
               // and RPC layers encode it against OrchestrationShellSnapshot on the
@@ -2809,6 +2868,7 @@ pending_approval_requests AS (
                         backgroundLiveness: threadBackgroundLiveness.getThreadBackgroundLiveness(
                           row.threadId,
                         ),
+                        latestAssistantPreview: assistantPreviewByThread.get(row.threadId) ?? null,
                         planProgress: threadPlanProgress.getThreadPlanProgress(row.threadId),
                       } satisfies OrchestrationThreadShell)
                     : Result.failVoid,
@@ -3264,40 +3324,49 @@ pending_approval_requests AS (
 
   const getThreadShellById: ProjectionSnapshotQueryShape["getThreadShellById"] = (threadId) =>
     Effect.gen(function* () {
-      const [threadRow, latestTurnRow, sessionRow, pullRequestRows] = yield* Effect.all([
-        getActiveThreadRowById({ threadId }).pipe(
-          Effect.mapError(
-            toPersistenceSqlOrDecodeError(
-              "ProjectionSnapshotQuery.getThreadShellById:getThread:query",
-              "ProjectionSnapshotQuery.getThreadShellById:getThread:decodeRow",
+      const [threadRow, latestTurnRow, sessionRow, pullRequestRows, assistantPreviewRow] =
+        yield* Effect.all([
+          getActiveThreadRowById({ threadId }).pipe(
+            Effect.mapError(
+              toPersistenceSqlOrDecodeError(
+                "ProjectionSnapshotQuery.getThreadShellById:getThread:query",
+                "ProjectionSnapshotQuery.getThreadShellById:getThread:decodeRow",
+              ),
             ),
           ),
-        ),
-        getLatestTurnRowByThread({ threadId }).pipe(
-          Effect.mapError(
-            toPersistenceSqlOrDecodeError(
-              "ProjectionSnapshotQuery.getThreadShellById:getLatestTurn:query",
-              "ProjectionSnapshotQuery.getThreadShellById:getLatestTurn:decodeRow",
+          getLatestTurnRowByThread({ threadId }).pipe(
+            Effect.mapError(
+              toPersistenceSqlOrDecodeError(
+                "ProjectionSnapshotQuery.getThreadShellById:getLatestTurn:query",
+                "ProjectionSnapshotQuery.getThreadShellById:getLatestTurn:decodeRow",
+              ),
             ),
           ),
-        ),
-        getThreadSessionRowByThread({ threadId }).pipe(
-          Effect.mapError(
-            toPersistenceSqlOrDecodeError(
-              "ProjectionSnapshotQuery.getThreadShellById:getSession:query",
-              "ProjectionSnapshotQuery.getThreadShellById:getSession:decodeRow",
+          getThreadSessionRowByThread({ threadId }).pipe(
+            Effect.mapError(
+              toPersistenceSqlOrDecodeError(
+                "ProjectionSnapshotQuery.getThreadShellById:getSession:query",
+                "ProjectionSnapshotQuery.getThreadShellById:getSession:decodeRow",
+              ),
             ),
           ),
-        ),
-        listThreadPullRequestRowsByThread({ threadId }).pipe(
-          Effect.mapError(
-            toPersistenceSqlOrDecodeError(
-              "ProjectionSnapshotQuery.getThreadShellById:listPullRequests:query",
-              "ProjectionSnapshotQuery.getThreadShellById:listPullRequests:decodeRows",
+          listThreadPullRequestRowsByThread({ threadId }).pipe(
+            Effect.mapError(
+              toPersistenceSqlOrDecodeError(
+                "ProjectionSnapshotQuery.getThreadShellById:listPullRequests:query",
+                "ProjectionSnapshotQuery.getThreadShellById:listPullRequests:decodeRows",
+              ),
             ),
           ),
-        ),
-      ]);
+          getAssistantPreviewRowByThread({ threadId }).pipe(
+            Effect.mapError(
+              toPersistenceSqlOrDecodeError(
+                "ProjectionSnapshotQuery.getThreadShellById:getAssistantPreview:query",
+                "ProjectionSnapshotQuery.getThreadShellById:getAssistantPreview:decodeRow",
+              ),
+            ),
+          ),
+        ]);
 
       if (Option.isNone(threadRow)) {
         return Option.none<OrchestrationThreadShell>();
@@ -3344,6 +3413,9 @@ pending_approval_requests AS (
         backgroundLiveness: threadBackgroundLiveness.getThreadBackgroundLiveness(
           threadRow.value.threadId,
         ),
+        latestAssistantPreview: Option.isSome(assistantPreviewRow)
+          ? assistantPreviewRow.value.preview
+          : null,
         planProgress: threadPlanProgress.getThreadPlanProgress(threadRow.value.threadId),
       } satisfies OrchestrationThreadShell);
     });

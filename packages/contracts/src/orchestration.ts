@@ -927,6 +927,13 @@ export const OrchestrationThreadShell = Schema.Struct({
    */
   backgroundLiveness: Schema.optional(Schema.NullOr(Schema.Literals(["working", "monitoring"]))),
   /**
+   * Personal build: the start of the agent's latest finished reply, for the
+   * sidebar's message preview. Read from the messages table at query time (no
+   * schema change); only sent for threads that aren't settled. Optional so
+   * old servers/clients interop.
+   */
+  latestAssistantPreview: Schema.optional(Schema.NullOr(Schema.String)),
+  /**
    * Current plan step while a turn runs, for the Working indicators
    * (sidebar row, in-chat working line). Cleared when the turn settles —
    * never persists as stale UI. Optional so old servers/clients interop.

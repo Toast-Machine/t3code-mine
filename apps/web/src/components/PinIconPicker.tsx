@@ -24,7 +24,7 @@ function matches(words: string, query: string): boolean {
   return words.replaceAll("-", " ").includes(query);
 }
 
-// Icon picker for a pinned thread's tile, anchored to the tile: line icons
+// Icon picker for a chat (pinned tile or list row), anchored to it: line icons
 // first (in a chosen color), emoji second. Remove returns the tile to its
 // project icon.
 export function PinIconPicker(props: { threadKey: string | null; onClose: () => void }) {
@@ -51,7 +51,7 @@ function PinIconPickerPopup(props: { threadKey: string; onClose: () => void }) {
   const anchor = useMemo(
     () =>
       document.querySelector(
-        `[data-thread-item="${CSS.escape(props.threadKey)}"] [data-testid="sidebar-row-tile"]`,
+        `[data-thread-item="${CSS.escape(props.threadKey)}"] [data-testid^="sidebar-row-"]`,
       ),
     [props.threadKey],
   );

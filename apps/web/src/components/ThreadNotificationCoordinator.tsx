@@ -1,5 +1,6 @@
 import { useAtomValue } from "@effect/atom-react";
 import { useNavigate, useParams } from "@tanstack/react-router";
+import { scopeThreadRef, scopedThreadKey } from "@t3tools/client-runtime/environment";
 import type { EnvironmentId, ThreadId } from "@t3tools/contracts";
 import * as Option from "effect/Option";
 import {
@@ -20,6 +21,7 @@ import {
   setNotificationBadge,
   unlockNotificationAudio,
 } from "../threadNotifications";
+import { useBackgroundGraceVersion, withBackgroundGrace } from "../backgroundGrace";
 import { useNeedsYouCount } from "./needsYouCount";
 import { resolveSidebarThreadStatus } from "./Sidebar.logic";
 import { toastManager } from "./ui/toast";
@@ -107,14 +109,20 @@ function EnvironmentNotifications({
   const previous = useRef(
     new Map<ThreadId, { attention: string | null; completion: number | null }>(),
   );
+  const graceVersion = useBackgroundGraceVersion();
 
   useEffect(() => {
+    void graceVersion; // a grace window ending re-runs this to release held threads
     if (shell.status !== "live" || Option.isNone(shell.snapshot)) {
       previous.current.clear();
       return;
     }
     const next = new Map<ThreadId, { attention: string | null; completion: number | null }>();
-    for (const thread of shell.snapshot.value.threads) {
+    for (const rawThread of shell.snapshot.value.threads) {
+      const thread = withBackgroundGrace(
+        scopedThreadKey(scopeThreadRef(environmentId, rawThread.id)),
+        rawThread,
+      );
       let status = resolveSidebarThreadStatus(thread);
       if (status === "ready" && thread.latestTurn?.state === "error") status = "failed";
       const prior = previous.current.get(thread.id);
@@ -223,6 +231,7 @@ function EnvironmentNotifications({
     navigate,
     onNotification,
     shell,
+    graceVersion,
   ]);
 
   return null;

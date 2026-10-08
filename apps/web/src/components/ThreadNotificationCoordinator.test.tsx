@@ -17,6 +17,8 @@ const state = vi.hoisted(() => ({
   approval: false,
   sessionError: false,
   turnError: false,
+  running: false,
+  background: null as "working" | "monitoring" | null,
   add: vi.fn(
     (_toast: { title: string; description: string; actionProps: { onClick: () => void } }) =>
       "toast-1",
@@ -40,7 +42,12 @@ vi.mock("@effect/atom-react", () => ({
           archivedAt: state.archivedAt,
           hasPendingUserInput: state.input,
           hasPendingApprovals: state.approval,
-          session: state.sessionError ? { status: "error" } : null,
+          session: state.sessionError
+            ? { status: "error" }
+            : state.running
+              ? { status: "running" }
+              : null,
+          backgroundLiveness: state.background,
           latestTurn: {
             turnId: "turn-1",
             state: state.turnError ? "error" : state.completedAt ? "completed" : "running",
@@ -79,6 +86,7 @@ vi.mock("./ui/toast", () => ({
   toastManager: { add: state.add, close: state.close },
 }));
 
+import { BACKGROUND_GRACE_MS } from "../backgroundGrace";
 import { ThreadNotificationCoordinator } from "./ThreadNotificationCoordinator";
 
 let renderer: ReactTestRenderer | undefined;
@@ -110,6 +118,8 @@ beforeEach(() => {
     approval: false,
     sessionError: false,
     turnError: false,
+    running: false,
+    background: null,
   });
   vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
   vi.stubGlobal("window", new EventTarget());
@@ -131,6 +141,45 @@ afterEach(async () => {
 });
 
 describe("thread notifications", () => {
+  // Personal build: a monitor finishing after the turn ended is usually
+  // followed by the agent starting again, so "done" waits out a grace window.
+  describe("when background work ends after the turn", () => {
+    async function finishTurnWhileMonitoring() {
+      state.background = "monitoring";
+      await render();
+      await complete();
+      await render();
+      expect(state.add).not.toHaveBeenCalled();
+      state.background = null;
+      await render();
+    }
+
+    it("stays quiet when the agent starts again inside the grace window", async () => {
+      await finishTurnWhileMonitoring();
+      expect(state.add).not.toHaveBeenCalled();
+      state.running = true;
+      await render();
+      expect(state.add).not.toHaveBeenCalled();
+    });
+
+    it("alerts once the grace window ends if the agent stays done", async () => {
+      vi.useFakeTimers();
+      try {
+        await finishTurnWhileMonitoring();
+        expect(state.add).not.toHaveBeenCalled();
+        await act(async () => {
+          vi.advanceTimersByTime(BACKGROUND_GRACE_MS);
+        });
+        expect(state.add).toHaveBeenCalledTimes(1);
+        expect(state.add).toHaveBeenLastCalledWith(
+          expect.objectContaining({ title: "Thread completed" }),
+        );
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+  });
+
   it("alerts once with system alerts off and opens the completed thread", async () => {
     await render();
     await complete();

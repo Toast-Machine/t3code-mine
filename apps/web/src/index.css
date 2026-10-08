@@ -1691,6 +1691,19 @@ code {
   }
 }
 
+/* Personal build: line icons always stroke in a solid color. A muted color
+   with transparency (text-foreground/80, or one inherited from a faded
+   button) paints each stroke separately, so crossings and joins draw twice
+   and show as darker spots. Dropping the alpha keeps the hue; a fully
+   transparent color (alpha 0, used to hide an icon) stays hidden. Fading a
+   whole icon with `opacity` composites it as one image, so that stays fine.
+   In the base layer so an explicit stroke utility on an icon still wins. */
+@layer base {
+  svg.lucide {
+    stroke: rgb(from currentColor r g b / calc(alpha * 1000));
+  }
+}
+
 .drag-region button,
 .drag-region input,
 .drag-region textarea,

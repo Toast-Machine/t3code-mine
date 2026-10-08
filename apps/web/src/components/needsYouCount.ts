@@ -1,10 +1,10 @@
 import { useAtomValue } from "@effect/atom-react";
 import { scopeThreadRef, scopedThreadKey } from "@t3tools/client-runtime/environment";
 import type { EnvironmentThreadShell } from "@t3tools/client-runtime/state/models";
-import { effectiveSnoozed } from "@t3tools/client-runtime/state/thread-settled";
+import { effectiveSnoozed, threadWokeAt } from "@t3tools/client-runtime/state/thread-settled";
 import { useMemo } from "react";
 
-import { useThreadShells } from "../state/entities";
+import { useThreadShellsWithGrace } from "../threadShellsWithGrace";
 import { environmentServerConfigsAtom } from "../state/server";
 import { useUiStateStore } from "../uiStateStore";
 import {
@@ -13,14 +13,30 @@ import {
   resolveSidebarThreadStatus,
 } from "./Sidebar.logic";
 
+// Personal build: a snoozed thread that woke and hasn't been looked at since.
+// Same rule as the sidebar row's Woke label; opening the thread or marking it
+// read clears it.
+export function isThreadWoke(
+  thread: EnvironmentThreadShell,
+  lastVisitedAt: string | undefined,
+  now: string,
+): boolean {
+  if (thread.settledOverride === "settled") return false;
+  const wokeAt = threadWokeAt(thread, { now });
+  const wokeMs = wokeAt === null ? Number.NaN : Date.parse(wokeAt);
+  if (Number.isNaN(wokeMs)) return false;
+  const visitedMs = lastVisitedAt === undefined ? Number.NaN : Date.parse(lastVisitedAt);
+  return Number.isNaN(visitedMs) || visitedMs < wokeMs;
+}
+
 interface NeedsYouCapabilities {
   readonly threadSnooze?: boolean;
   readonly threadSettlement?: boolean;
 }
 
 // Personal build: how many threads need you, for the dock badge. Same rule as
-// the sidebar's "Needs you" group (approval, input, failed, or finished and
-// unread), across every project, pins included. Snoozed, settled, archived,
+// the sidebar's "Needs you" group (approval, input, failed, woke, or finished
+// and unread), across every project, pins included. Snoozed, settled, archived,
 // and still-working threads don't count.
 export function countThreadsNeedingYou(
   threads: readonly EnvironmentThreadShell[],
@@ -40,6 +56,7 @@ export function countThreadsNeedingYou(
       status === "approval" ||
       status === "input" ||
       status === "failed" ||
+      isThreadWoke(thread, lastVisitedAtByKey[key], now) ||
       hasUnseenCompletion({ ...thread, lastVisitedAt: lastVisitedAtByKey[key] })
     ) {
       count += 1;
@@ -49,7 +66,7 @@ export function countThreadsNeedingYou(
 }
 
 export function useNeedsYouCount(): number {
-  const threads = useThreadShells();
+  const threads = useThreadShellsWithGrace();
   const serverConfigs = useAtomValue(environmentServerConfigsAtom);
   const lastVisitedAtByKey = useUiStateStore((state) => state.threadLastVisitedAtById);
   return useMemo(
