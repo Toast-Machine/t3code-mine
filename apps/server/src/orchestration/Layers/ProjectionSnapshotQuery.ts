@@ -1657,8 +1657,7 @@ const makeProjectionSnapshotQuery = Effect.gen(function* () {
   // thread's latest finished assistant reply. Served by the
   // (thread_id, created_at) message index; settled threads render without a
   // preview, so the snapshot skips them.
-  const latestAssistantPreviewSql = sql`
-    SELECT substr(messages.text, 1, 240)
+  const latestAssistantMessageFromSql = sql`
     FROM projection_thread_messages messages
     WHERE messages.thread_id = threads.thread_id
       AND messages.role = 'assistant'
@@ -1666,16 +1665,23 @@ const makeProjectionSnapshotQuery = Effect.gen(function* () {
     ORDER BY messages.created_at DESC, messages.message_id DESC
     LIMIT 1
   `;
+  // Its time tells a working thread whether the preview is a note from the
+  // running turn or the previous turn's stale answer.
+  const latestAssistantPreviewSql = sql`
+    (SELECT substr(messages.text, 1, 240) ${latestAssistantMessageFromSql}) AS "preview",
+    (SELECT messages.created_at ${latestAssistantMessageFromSql}) AS "previewAt"
+  `;
   const AssistantPreviewRowSchema = Schema.Struct({
     threadId: ThreadId,
     preview: Schema.NullOr(Schema.String),
+    previewAt: Schema.NullOr(IsoDateTime),
   });
   const listUnsettledAssistantPreviewRows = SqlSchema.findAll({
     Request: Schema.Void,
     Result: AssistantPreviewRowSchema,
     execute: () =>
       sql`
-        SELECT threads.thread_id AS "threadId", (${latestAssistantPreviewSql}) AS "preview"
+        SELECT threads.thread_id AS "threadId", ${latestAssistantPreviewSql}
         FROM projection_threads threads
         WHERE threads.deleted_at IS NULL
           AND threads.archived_at IS NULL
@@ -1687,7 +1693,7 @@ const makeProjectionSnapshotQuery = Effect.gen(function* () {
     Result: AssistantPreviewRowSchema,
     execute: ({ threadId }) =>
       sql`
-        SELECT threads.thread_id AS "threadId", (${latestAssistantPreviewSql}) AS "preview"
+        SELECT threads.thread_id AS "threadId", ${latestAssistantPreviewSql}
         FROM projection_threads threads
         WHERE threads.thread_id = ${threadId}
       `,
@@ -2813,7 +2819,7 @@ pending_approval_requests AS (
               );
               const pullRequestsByThread = groupPullRequestRowsByThread(pullRequestRows);
               const assistantPreviewByThread = new Map(
-                assistantPreviewRows.map((row) => [row.threadId, row.preview] as const),
+                assistantPreviewRows.map((row) => [row.threadId, row] as const),
               );
 
               // Built from schema-decoded rows, so no second decode here. The HTTP
@@ -2868,8 +2874,12 @@ pending_approval_requests AS (
                         backgroundLiveness: threadBackgroundLiveness.getThreadBackgroundLiveness(
                           row.threadId,
                         ),
-                        latestAssistantPreview: assistantPreviewByThread.get(row.threadId) ?? null,
+                        latestAssistantPreview:
+                          assistantPreviewByThread.get(row.threadId)?.preview ?? null,
+                        latestAssistantPreviewAt:
+                          assistantPreviewByThread.get(row.threadId)?.previewAt ?? null,
                         planProgress: threadPlanProgress.getThreadPlanProgress(row.threadId),
+                        liveActivity: threadPlanProgress.getThreadLiveActivity(row.threadId),
                       } satisfies OrchestrationThreadShell)
                     : Result.failVoid,
                 ),
@@ -3416,7 +3426,11 @@ pending_approval_requests AS (
         latestAssistantPreview: Option.isSome(assistantPreviewRow)
           ? assistantPreviewRow.value.preview
           : null,
+        latestAssistantPreviewAt: Option.isSome(assistantPreviewRow)
+          ? assistantPreviewRow.value.previewAt
+          : null,
         planProgress: threadPlanProgress.getThreadPlanProgress(threadRow.value.threadId),
+        liveActivity: threadPlanProgress.getThreadLiveActivity(threadRow.value.threadId),
       } satisfies OrchestrationThreadShell);
     });
 

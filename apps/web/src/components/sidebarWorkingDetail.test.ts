@@ -1,0 +1,59 @@
+import { EventId, TurnId } from "@t3tools/contracts";
+import { describe, expect, it } from "vite-plus/test";
+
+import { sidebarWorkingDetail } from "./sidebarWorkingDetail";
+
+const turnId = TurnId.make("turn-1");
+const time = (second: number) => new Date(Date.UTC(2026, 0, 1, 0, 0, second)).toISOString();
+
+const working = {
+  latestTurn: {
+    turnId,
+    state: "running" as const,
+    requestedAt: time(10),
+    startedAt: time(10),
+    completedAt: null,
+    assistantMessageId: null,
+  },
+  session: null,
+  latestAssistantPreview: "Fixed. The zoom bar no longer flashes.",
+  latestAssistantPreviewAt: time(5),
+  liveActivity: null,
+  planProgress: null,
+};
+
+const gitActivity = {
+  id: EventId.make("activity-1"),
+  tone: "tool" as const,
+  kind: "tool.updated",
+  summary: "Command run",
+  payload: {
+    itemType: "command_execution",
+    status: "inProgress",
+    title: "Command run",
+    detail: "Bash: git status",
+    data: { toolName: "Bash", command: "git status" },
+  },
+  turnId,
+  createdAt: time(12),
+};
+
+describe("sidebarWorkingDetail", () => {
+  it("never shows the previous turn's answer", () => {
+    expect(sidebarWorkingDetail(working)).toBe("");
+  });
+
+  it("names the step the agent is on", () => {
+    expect(sidebarWorkingDetail({ ...working, liveActivity: gitActivity })).toBe("Running git");
+  });
+
+  it("shows the agent's newest note from this turn", () => {
+    const note = {
+      ...working,
+      liveActivity: gitActivity,
+      latestAssistantPreview: "Checking how the zoom bar loads.",
+      latestAssistantPreviewAt: time(14),
+    };
+    expect(sidebarWorkingDetail(note)).toBe("Checking how the zoom bar loads.");
+  });
+});

@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vite-plus/test";
+import { EventId, TurnId } from "@t3tools/contracts";
 import * as ThreadPlanProgress from "./ThreadPlanProgress.ts";
 
 describe("ThreadPlanProgress", () => {
@@ -40,5 +41,28 @@ describe("ThreadPlanProgress", () => {
     progress.recordPlanProgress(threadId, [{ step: "Only step", status: "inProgress" }]);
     progress.clearThreadPlanProgress(threadId);
     expect(progress.getThreadPlanProgress(threadId)).toBeNull();
+  });
+
+  it("keeps the running turn's latest step small, and clears it with the plan", () => {
+    const progress = ThreadPlanProgress.make();
+    const threadId = "t-plan-4";
+    progress.recordLiveActivity(threadId, {
+      id: EventId.make("activity-1"),
+      tone: "tool",
+      kind: "tool.updated",
+      summary: "File edited",
+      payload: {
+        data: { toolName: "Edit", input: { file_path: "a.ts", new_string: "x".repeat(5000) } },
+      },
+      turnId: TurnId.make("turn-1"),
+      createdAt: "2026-01-01T00:00:00.000Z",
+    });
+    const payload = progress.getThreadLiveActivity(threadId)?.payload as {
+      data: { input: { file_path: string; new_string: string } };
+    };
+    expect(payload.data.input.file_path).toBe("a.ts");
+    expect(payload.data.input.new_string.length).toBeLessThanOrEqual(200);
+    progress.clearThreadPlanProgress(threadId);
+    expect(progress.getThreadLiveActivity(threadId)).toBeNull();
   });
 });

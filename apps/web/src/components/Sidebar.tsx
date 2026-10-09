@@ -113,6 +113,7 @@ import {
 } from "../sidebarProjectGrouping";
 import { legacyProjectCwdPreferenceKey, useUiStateStore } from "../uiStateStore";
 import { useThreadShellsWithGrace } from "../threadShellsWithGrace";
+import { sidebarWorkingDetail } from "./sidebarWorkingDetail";
 import { sidebarMessagePreview } from "./messagePreview";
 import { isThreadWoke } from "./needsYouCount";
 import { usePinIcon } from "../pinIcons";
@@ -408,7 +409,11 @@ function SidebarThreadTooltip({
 }) {
   const driverKind = providerEntry?.driverKind ?? null;
   const supportsMultiplePullRequests = useSupportsMultiplePullRequests(thread.environmentId);
-  const latestReply = sidebarMessagePreview(thread.latestAssistantPreview);
+  // Personal build: a working chat's card says what it's doing, like its row.
+  const latestReply =
+    resolveSidebarThreadStatus(thread) === "working"
+      ? sidebarWorkingDetail(thread) || null
+      : sidebarMessagePreview(thread.latestAssistantPreview);
   return (
     <TooltipPopup side="right" align="start" sideOffset={4} variant="glass">
       {/* The viewport's own inset (py-1 px-2) plus this one make the floating inset. */}
@@ -1663,10 +1668,9 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: {
     !hasUnsentDraft && lineStatus?.icon === "failed"
       ? sidebarMessagePreview(thread.session?.lastError)
       : null;
-  // While the agent works, its last reply is stale (like a messages app showing
-  // "typing…" instead of the old message): the line reads "Working", with the
-  // current plan step when there is one.
-  const workingDetails = status === "working" ? (thread.planProgress?.step ?? "") : null;
+  // While the agent works, its last reply is stale: the line says what it's
+  // doing now instead.
+  const workingDetails = status === "working" ? sidebarWorkingDetail(thread) : null;
   const rowDetails =
     (hasUnsentDraft ? draftPreview : null) ??
     failurePreview ??

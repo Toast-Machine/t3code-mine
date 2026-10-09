@@ -2603,6 +2603,17 @@ const make = Effect.gen(function* () {
       }
 
       const activities = runtimeEventToActivities(activityEvent, taskTitle);
+      // Personal build: the sidebar's live step ("Running git").
+      for (const activity of activities) {
+        if (
+          activity.turnId !== null &&
+          (activity.kind === "tool.updated" ||
+            activity.kind === "tool.completed" ||
+            activity.kind === "task.progress")
+        ) {
+          threadPlanProgress.recordLiveActivity(thread.id, activity);
+        }
+      }
       yield* Effect.forEach(activities, (activity) =>
         providerCommandId(event, "thread-activity-append").pipe(
           Effect.flatMap((commandId) =>

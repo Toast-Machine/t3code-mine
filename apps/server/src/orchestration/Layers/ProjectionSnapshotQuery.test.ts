@@ -631,7 +631,9 @@ projectionSnapshotLayer("ProjectionSnapshotQuery", (it) => {
           hasActionableProposedPlan: false,
           backgroundLiveness: null,
           latestAssistantPreview: "hello from projection",
+          latestAssistantPreviewAt: "2026-02-24T00:00:04.000Z",
           planProgress: null,
+          liveActivity: null,
         },
       ]);
 

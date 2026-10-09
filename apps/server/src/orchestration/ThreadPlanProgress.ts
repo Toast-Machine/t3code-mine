@@ -14,6 +14,7 @@
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
+import type { OrchestrationThreadActivity } from "@t3tools/contracts";
 
 export interface ThreadPlanProgress {
   readonly step: string;
@@ -39,11 +40,20 @@ export class ThreadPlanProgressService extends Context.Service<
     readonly clearThreadPlanProgress: (threadId: string) => void;
 
     readonly getThreadPlanProgress: (threadId: string) => ThreadPlanProgress | null;
+
+    /**
+     * Personal build: the running turn's latest tool step, so the sidebar can
+     * say "Running git" instead of a bare "Working". Cleared with the plan.
+     */
+    readonly recordLiveActivity: (threadId: string, activity: OrchestrationThreadActivity) => void;
+
+    readonly getThreadLiveActivity: (threadId: string) => OrchestrationThreadActivity | null;
   }
 >()("t3/orchestration/ThreadPlanProgress/ThreadPlanProgressService") {}
 
 export function make(): ThreadPlanProgressService["Service"] {
   const progressByThreadId = new Map<string, ThreadPlanProgress>();
+  const liveActivityByThreadId = new Map<string, OrchestrationThreadActivity>();
 
   return {
     recordPlanProgress: (threadId, plan) => {
@@ -67,10 +77,37 @@ export function make(): ThreadPlanProgressService["Service"] {
 
     clearThreadPlanProgress: (threadId) => {
       progressByThreadId.delete(threadId);
+      liveActivityByThreadId.delete(threadId);
     },
 
     getThreadPlanProgress: (threadId) => progressByThreadId.get(threadId) ?? null,
+
+    recordLiveActivity: (threadId, activity) => {
+      liveActivityByThreadId.set(threadId, { ...activity, payload: trimPayload(activity.payload) });
+    },
+
+    getThreadLiveActivity: (threadId) => liveActivityByThreadId.get(threadId) ?? null,
   };
+}
+
+// The sidebar only needs a step's name and target, but tool payloads carry
+// whole file bodies and outputs. Every shell push sends this, so long strings
+// are cut and deep structures dropped.
+const MAX_STRING_LENGTH = 200;
+const MAX_DEPTH = 4;
+
+function trimPayload(value: unknown, depth = 0): unknown {
+  if (typeof value === "string") {
+    return value.length > MAX_STRING_LENGTH ? value.slice(0, MAX_STRING_LENGTH) : value;
+  }
+  if (value === null || typeof value !== "object") return value;
+  if (depth >= MAX_DEPTH) return undefined;
+  if (Array.isArray(value)) {
+    return value.slice(0, 8).map((item) => trimPayload(item, depth + 1));
+  }
+  return Object.fromEntries(
+    Object.entries(value).map(([key, item]) => [key, trimPayload(item, depth + 1)]),
+  );
 }
 
 export const layer = Layer.effect(ThreadPlanProgressService, Effect.sync(make));

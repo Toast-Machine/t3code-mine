@@ -933,6 +933,14 @@ export const OrchestrationThreadShell = Schema.Struct({
    * old servers/clients interop.
    */
   latestAssistantPreview: Schema.optional(Schema.NullOr(Schema.String)),
+  /** Personal build: when that reply was written. Optional for interop. */
+  latestAssistantPreviewAt: Schema.optional(Schema.NullOr(IsoDateTime)),
+  /**
+   * Personal build: the running turn's latest tool step, payload trimmed,
+   * for the sidebar's "Running git" line. Cleared when the turn settles.
+   * Optional so old servers/clients interop.
+   */
+  liveActivity: Schema.optional(Schema.NullOr(OrchestrationThreadActivity)),
   /**
    * Current plan step while a turn runs, for the Working indicators
    * (sidebar row, in-chat working line). Cleared when the turn settles —
