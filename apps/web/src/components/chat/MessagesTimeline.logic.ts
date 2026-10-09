@@ -366,6 +366,8 @@ export type MessagesTimelineRow =
       groupedEntries: WorkLogEntry[];
       isExpandedToolGroup: boolean;
       displayLabel?: string;
+      /** Personal build: your answer to the agent's question, shown as a reply bubble. */
+      chatReply?: true;
     }
   | {
       kind: "work-live";
@@ -1695,6 +1697,7 @@ function isRowUnchanged(a: MessagesTimelineRow, b: MessagesTimelineRow): boolean
       return (
         a.isExpandedToolGroup === bw.isExpandedToolGroup &&
         a.displayLabel === bw.displayLabel &&
+        a.chatReply === bw.chatReply &&
         Equal.equals(a.groupedEntries, bw.groupedEntries)
       );
     }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vite-plus/test";
-import { MessageId, TurnId } from "@t3tools/contracts";
+import { ApprovalRequestId, MessageId, TurnId } from "@t3tools/contracts";
 
 import type { TimelineEntry } from "../../session-logic";
 import { deriveMessagesTimelineRows } from "./MessagesTimeline.logic";
@@ -123,5 +123,65 @@ describe("applyChatStyleRows", () => {
     expect(expanded.at(-1)).toMatchObject({ kind: "chat-typing" });
     expect(expanded.some((row) => row.id === "note")).toBe(true);
     expect(expanded.some((row) => row.kind === "working" || row.kind === "thinking")).toBe(false);
+  });
+
+  it("keeps the agent's question and your answer visible as a reply", () => {
+    const question: TimelineEntry = {
+      id: "question",
+      kind: "work",
+      createdAt: time(2),
+      entry: {
+        id: "question",
+        turnId,
+        createdAt: time(2),
+        label: "Answered a question",
+        tone: "info",
+        questionAnswer: {
+          requestId: ApprovalRequestId.make("request-1"),
+          questionTextById: { q1: "Which phone should I use?" },
+          answers: { q1: "My real phone" },
+          attachmentsByQuestionId: {},
+        },
+      },
+    };
+    const rows = applyChatStyleRows(
+      deriveMessagesTimelineRows({
+        timelineEntries: [...settledTurn.slice(0, 2), question, ...settledTurn.slice(2)],
+        latestTurn: { turnId, state: "completed", startedAt: time(0), completedAt: time(5) },
+        isWorking: false,
+        activeTurnStartedAt: null,
+        turnDiffSummaries: [],
+        supportsConversationRollback: false,
+      }),
+      { activeTurnId: null, expandedTurnIds: new Set() },
+    );
+    expect(rows.find((row) => row.id === "question")).toMatchObject({ chatReply: true });
+  });
+
+  it("folds work from before a message you sent mid-turn under its own line", () => {
+    const entries = [
+      ...settledTurn.slice(0, 3),
+      message("steer", "user", "Also check the slider", 4),
+      tool("slider", "vp test run slider", 5, true),
+    ];
+    const rows = applyChatStyleRows(
+      deriveMessagesTimelineRows({
+        timelineEntries: entries,
+        runningTurnId: turnId,
+        isWorking: true,
+        activeTurnStartedAt: time(0),
+        turnDiffSummaries: [],
+        supportsConversationRollback: false,
+      }),
+      { activeTurnId: turnId, expandedTurnIds: new Set() },
+    );
+    expect(rows.map((row) => row.kind)).toEqual([
+      "message",
+      "chat-work",
+      "message",
+      "chat-work",
+      "chat-typing",
+    ]);
+    expect(rows[1]).toMatchObject({ label: "Work so far", live: false, turnId });
   });
 });

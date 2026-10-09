@@ -1725,7 +1725,7 @@ const TimelineRowContent = memo(function TimelineRowContent({ row }: { row: Time
           : null,
         // Personal build: the turn's work hangs off one continuous rail. It is
         // drawn on the whole row, padding included, so stacked rows join up.
-        chatRowOnRail(row) && "ms-2 border-s border-border/70 ps-3",
+        chatRowOnRail(row) && "ms-2 border-s-2 border-border ps-3",
       )}
       data-timeline-row-id={row.id}
       data-timeline-row-kind={row.kind}
@@ -1734,7 +1734,8 @@ const TimelineRowContent = memo(function TimelineRowContent({ row }: { row: Time
       }
       data-message-role={row.kind === "message" ? row.message.role : undefined}
     >
-      {row.kind === "work" ? (
+      {row.kind === "work" && row.chatReply ? <ChatReplyTimelineRow row={row} /> : null}
+      {row.kind === "work" && !row.chatReply ? (
         <WorkGroupSection
           anchorKey={row.id}
           groupedEntries={row.groupedEntries}
@@ -1782,6 +1783,7 @@ function chatRowOnRail(row: TimelineRow): boolean {
     case "work-toggle":
       return row.chatEvent !== true;
     case "work":
+      return row.chatReply !== true;
     case "work-live":
     case "activity-group":
     case "thinking":
@@ -1846,7 +1848,7 @@ function QueuedMessageTimelineRow({
         : "Sends after the messages above it";
   return (
     <div className="flex flex-col items-end" data-queued-message-id={queuedMessage.id}>
-      <div className="max-w-[80%] rounded-2xl border border-dashed border-border p-3 text-message-foreground/80">
+      <div className="max-w-[80%] rounded-2xl rounded-br-md border-2 border-message-action/60 border-dashed px-4 py-2.5 text-message-action [--contrast-message-foreground:var(--message-action)] [&_[data-slot=button]]:text-message-action">
         {text.length > 0 ? (
           <UserMessageBody text={text} skills={ctx.skills} markdownCwd={ctx.markdownCwd} />
         ) : null}
@@ -1998,6 +2000,11 @@ const MESSAGE_HEADING_LEVEL = 3;
 function MessageAuthorHeading({ children }: { children: string }) {
   return <h3 className="sr-only select-none">{children}</h3>;
 }
+
+// Personal build: your messages are a theme-color bubble. The overrides make the
+// text, chips, and borders inside it read light on the theme color.
+const USER_BUBBLE_CLASS_NAME =
+  "rounded-2xl rounded-br-md bg-message px-4 py-2.5 text-message-foreground [--contrast-message-foreground:var(--message-action-foreground)] [--message-surface:var(--message-action)] [--contrast-foreground:var(--message-action-foreground)] [--foreground:var(--message-action-foreground)] [--contrast-border:color-mix(in_srgb,var(--message-action-foreground)_35%,transparent)]";
 
 function UserTimelineRow({ row }: { row: Extract<TimelineRow, { kind: "message" }> }) {
   const ctx = use(TimelineRowCtx);
@@ -2157,7 +2164,7 @@ function UserTimelineRow({ row }: { row: Extract<TimelineRow, { kind: "message" 
 
   return (
     <div className="group flex flex-col items-end gap-1">
-      <div className="relative max-w-[80%] rounded-2xl rounded-br-md bg-message px-4 py-2.5 text-message-foreground [--contrast-message-foreground:var(--message-action-foreground)] [--message-surface:var(--message-action)]">
+      <div className={cn("relative max-w-[80%]", USER_BUBBLE_CLASS_NAME)}>
         <MessageAuthorHeading>You</MessageAuthorHeading>
         {(regularImages.length > 0 || userVideos.length > 0) && (
           <div className="mb-2 grid max-w-[210px] grid-cols-2 gap-2">
@@ -2439,7 +2446,7 @@ function AssistantTimelineRow({ row }: { row: Extract<TimelineRow, { kind: "mess
           // the way sit quietly in the turn's work.
           "relative min-w-0",
           finalReply
-            ? "w-fit max-w-full rounded-2xl rounded-bl-md bg-accent px-4 py-2.5"
+            ? "mt-2 w-fit max-w-full rounded-2xl rounded-bl-md bg-accent px-4 py-2.5"
             : "px-1 py-0.5 opacity-75",
         )}
       >
@@ -2650,8 +2657,29 @@ function ChatWorkTimelineRow({ row }: { row: Extract<TimelineRow, { kind: "chat-
 // will appear.
 function ChatTypingTimelineRow() {
   return (
-    <div className="flex w-fit items-center rounded-2xl rounded-bl-md bg-accent px-4 py-3">
+    <div className="mt-2 flex w-fit items-center rounded-2xl rounded-bl-md bg-accent px-4 py-3">
       <TypingDots />
+    </div>
+  );
+}
+
+// Personal build: your answer to a question the agent asked mid-turn, as a reply
+// bubble that quotes the question.
+function ChatReplyTimelineRow({ row }: { row: Extract<TimelineRow, { kind: "work" }> }) {
+  const answer = row.groupedEntries[0]?.questionAnswer;
+  if (!answer) return null;
+  const question = getQuestionTextPreview(answer);
+  const reply = getQuestionAnswerPreview(answer);
+  return (
+    <div className="flex justify-end">
+      <div className={cn("max-w-[80%] text-sm leading-relaxed", USER_BUBBLE_CLASS_NAME)}>
+        {question ? (
+          <div className="mb-1.5 border-s-2 border-current/40 ps-2.5 text-xs opacity-80">
+            {question}
+          </div>
+        ) : null}
+        <div className="whitespace-pre-wrap">{reply}</div>
+      </div>
     </div>
   );
 }
