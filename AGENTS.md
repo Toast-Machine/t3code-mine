@@ -90,6 +90,10 @@ The most common defect in this repo is a change that works on the path you teste
 
 ## Test data
 
+> **Personal build:** this fork overrides the section below. Never copy the maintainer's real
+> data; test in a fake seeded environment and never start a real agent turn. See the
+> Preview section of [FORK.md](./FORK.md).
+
 An empty database is a bad test. Seed your worktree's `.t3` with a copy of real data instead of pointing at live state:
 
 - Copy from `~/.t3/userdata` (the developer's real data, the most realistic test set) or `~/.t3/dev`. Worktree state lives at `<worktree>/.t3/userdata`.
