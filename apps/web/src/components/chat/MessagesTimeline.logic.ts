@@ -31,6 +31,7 @@ import {
 } from "../../session-logic";
 import { type ChatMessage, type ProposedPlan, type TurnDiffSummary } from "../../types";
 import type { QueuedComposerMessage } from "../../queuedMessageStore";
+import { chatWorkStatusEquals, type ChatWorkStatus } from "./chatStyleRows";
 import {
   type MessageId,
   type OrchestrationLatestTurn,
@@ -390,6 +391,9 @@ export type MessagesTimelineRow =
       toolIcon?: WorkLogEntry["toolIcon"];
       summaryToolIcon?: "browser" | "device" | "t3-code" | "pull-request";
       hasFailure: boolean;
+      /** Personal build: only background jobs finishing; shown as an event between turns. */
+      isBackgroundEvent?: true;
+      chatEvent?: true;
     }
   | {
       kind: "turn-fold";
@@ -416,6 +420,26 @@ export type MessagesTimelineRow =
       assistantCopyStreaming: boolean;
       assistantTurnDiffSummary?: TurnDiffSummary | undefined;
       revertTurnCount?: number | undefined;
+      /** Personal build: a final reply whose metadata row moved below its trailing tools. */
+      metaMovedBelowTools?: true;
+    }
+  | {
+      // Personal build: the typing bubble where a running turn's answer will appear.
+      kind: "chat-typing";
+      id: string;
+      createdAt: string | null;
+    }
+  | {
+      // Personal build: a turn's single work line (see chatStyleRows.ts).
+      kind: "chat-work";
+      id: string;
+      createdAt: string | null;
+      turnId: TurnId | null;
+      expanded: boolean;
+      /** Running turns show live status; settled ones show `label`. */
+      live: boolean;
+      label: string;
+      status: ChatWorkStatus;
     }
   | {
       kind: "assistant-meta";
@@ -908,7 +932,12 @@ function attachTrailingToolGroupsToAssistant(
   const result: MessagesTimelineRow[] = [];
   for (const [index, row] of rows.entries()) {
     if (row.kind === "message" && messageRowsWithoutMeta.has(row.id)) {
-      result.push({ ...row, showAssistantMeta: false, showAssistantCopyButton: false });
+      result.push({
+        ...row,
+        showAssistantMeta: false,
+        showAssistantCopyButton: false,
+        metaMovedBelowTools: true,
+      });
     } else {
       result.push(row);
     }
@@ -1352,6 +1381,11 @@ export function deriveMessagesTimelineRows(input: {
             hasFailure:
               latestToolEntry !== undefined &&
               workEntryDisplayIndicatesToolFailure(latestToolEntry),
+            ...(visibleGroupedEntries.every(
+              (entry) => entry.isBackgroundTask && entry.sourceActivityKind === "task.completed",
+            )
+              ? { isBackgroundEvent: true as const }
+              : {}),
           });
           if (expanded) {
             nextRows.push(
@@ -1612,6 +1646,19 @@ function isRowUnchanged(a: MessagesTimelineRow, b: MessagesTimelineRow): boolean
     case "working":
     case "thinking":
       return a.createdAt === (b as typeof a).createdAt;
+    case "chat-typing":
+      return a.createdAt === (b as typeof a).createdAt;
+    case "chat-work": {
+      const bt = b as typeof a;
+      return (
+        a.createdAt === bt.createdAt &&
+        a.turnId === bt.turnId &&
+        a.expanded === bt.expanded &&
+        a.live === bt.live &&
+        a.label === bt.label &&
+        chatWorkStatusEquals(a.status, bt.status)
+      );
+    }
     case "worktree-setup":
       return a.snapshot === (b as typeof a).snapshot;
 
@@ -1676,7 +1723,9 @@ function isRowUnchanged(a: MessagesTimelineRow, b: MessagesTimelineRow): boolean
         a.summaryKind === bw.summaryKind &&
         a.toolSurface === bw.toolSurface &&
         Equal.equals(a.toolIcon, bw.toolIcon) &&
-        a.hasFailure === bw.hasFailure
+        a.hasFailure === bw.hasFailure &&
+        a.isBackgroundEvent === bw.isBackgroundEvent &&
+        a.chatEvent === bw.chatEvent
       );
     }
 
@@ -1689,7 +1738,8 @@ function isRowUnchanged(a: MessagesTimelineRow, b: MessagesTimelineRow): boolean
         a.showAssistantCopyButton === bm.showAssistantCopyButton &&
         a.assistantCopyStreaming === bm.assistantCopyStreaming &&
         a.assistantTurnDiffSummary === bm.assistantTurnDiffSummary &&
-        a.revertTurnCount === bm.revertTurnCount
+        a.revertTurnCount === bm.revertTurnCount &&
+        a.metaMovedBelowTools === bm.metaMovedBelowTools
       );
     }
   }

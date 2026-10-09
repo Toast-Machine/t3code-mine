@@ -208,6 +208,8 @@ import {
 import { TerminalContextInlineChip } from "./TerminalContextInlineChip";
 import { Popover, PopoverPopup, PopoverTrigger } from "../ui/popover";
 import { Spinner } from "../ui/spinner";
+import { applyChatStyleRows } from "./chatStyleRows";
+import { TypingDots } from "./ChatStyleLane";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 import { WorktreeSetupCard } from "./WorktreeSetupCard";
 import {
@@ -414,6 +416,8 @@ interface MessagesTimelineProps {
   onWorktreeSetupWorkLocally?: () => void;
   onOpenWorktreeSetupTerminal?: (terminalId: string) => void;
   listRef: React.RefObject<LegendListRef | null>;
+  /** Personal build: chat-style layout (see chatStyleRows.ts). */
+  chatStyle?: boolean;
   timelineEntries: ReturnType<typeof deriveTimelineEntries>;
   latestTurn: TimelineLatestTurn | null;
   runningTurnId: TurnId | null;
@@ -489,6 +493,7 @@ export const MessagesTimeline = memo(function MessagesTimeline({
   agentPanelModel,
   onOpenAgents = NOOP_OPEN_AGENTS,
   listRef,
+  chatStyle = false,
   timelineEntries,
   latestTurn,
   runningTurnId,
@@ -792,8 +797,15 @@ export const MessagesTimeline = memo(function MessagesTimeline({
         : null,
     );
     rowsProjectionRef.current = { threadKey: listIdentityKey, workspaceRoot, projection };
-    return projection.rows;
+    // Personal build: chat-style layout (see chatStyleRows.ts).
+    return chatStyle
+      ? applyChatStyleRows(projection.rows, {
+          activeTurnId: isWorking ? (runningTurnId ?? latestTurn?.turnId ?? null) : null,
+          expandedTurnIds: paintedExpandedTurnIds,
+        })
+      : projection.rows;
   }, [
+    chatStyle,
     rowsProjectionRef,
     listIdentityKey,
     workspaceRoot,
@@ -1711,6 +1723,9 @@ const TimelineRowContent = memo(function TimelineRowContent({ row }: { row: Time
           row.kind === "assistant-meta"
           ? "group/assistant"
           : null,
+        // Personal build: the turn's work hangs off one continuous rail. It is
+        // drawn on the whole row, padding included, so stacked rows join up.
+        chatRowOnRail(row) && "ms-2 border-s border-border/70 ps-3",
       )}
       data-timeline-row-id={row.id}
       data-timeline-row-kind={row.kind}
@@ -1729,7 +1744,13 @@ const TimelineRowContent = memo(function TimelineRowContent({ row }: { row: Time
       ) : null}
       {row.kind === "work-live" ? <LiveWorkEntryTimelineRow row={row} /> : null}
       {row.kind === "activity-group" ? <ActivityGroupTimelineRow row={row} /> : null}
-      {row.kind === "work-toggle" ? <WorkGroupToggleTimelineRow row={row} /> : null}
+      {row.kind === "work-toggle" ? (
+        row.chatEvent ? (
+          <ChatEventTimelineRow row={row} />
+        ) : (
+          <WorkGroupToggleTimelineRow row={row} />
+        )
+      ) : null}
       {row.kind === "turn-fold" ? <TurnFoldTimelineRow row={row} /> : null}
       {row.kind === "context-compaction" ? <ContextCompactionTimelineRow row={row} /> : null}
       {row.kind === "message" && row.message.role === "user" ? <UserTimelineRow row={row} /> : null}
@@ -1745,9 +1766,36 @@ const TimelineRowContent = memo(function TimelineRowContent({ row }: { row: Time
       {row.kind === "thinking" ? <ThinkingTimelineRow /> : null}
       {row.kind === "worktree-setup" ? <WorktreeSetupTimelineRow row={row} /> : null}
       {row.kind === "queued-message" ? <QueuedMessageTimelineRow row={row} /> : null}
+      {row.kind === "chat-work" ? <ChatWorkTimelineRow row={row} /> : null}
+      {row.kind === "chat-typing" ? <ChatTypingTimelineRow /> : null}
     </div>
   );
 });
+
+// Personal build: tool and thinking rows sit on the chat-style rail.
+function chatRowOnRail(row: TimelineRow): boolean {
+  switch (row.kind) {
+    case "message":
+      return (
+        row.message.role === "reasoning" || (row.message.role === "assistant" && !isChatAnswer(row))
+      );
+    case "work-toggle":
+      return row.chatEvent !== true;
+    case "work":
+    case "work-live":
+    case "activity-group":
+    case "thinking":
+      return true;
+    default:
+      return false;
+  }
+}
+
+// Personal build: an answer is the turn's final reply; other assistant text is a
+// note written along the way.
+function isChatAnswer(row: Extract<TimelineRow, { kind: "message" }>): boolean {
+  return row.showAssistantMeta || row.metaMovedBelowTools === true;
+}
 
 function WorktreeSetupTimelineRow({
   row,
@@ -2109,7 +2157,7 @@ function UserTimelineRow({ row }: { row: Extract<TimelineRow, { kind: "message" 
 
   return (
     <div className="group flex flex-col items-end gap-1">
-      <div className="relative max-w-[80%] rounded-2xl bg-message p-3 text-message-foreground">
+      <div className="relative max-w-[80%] rounded-2xl rounded-br-md bg-message px-4 py-2.5 text-message-foreground [--contrast-message-foreground:var(--message-action-foreground)] [--message-surface:var(--message-action)]">
         <MessageAuthorHeading>You</MessageAuthorHeading>
         {(regularImages.length > 0 || userVideos.length > 0) && (
           <div className="mb-2 grid max-w-[210px] grid-cols-2 gap-2">
@@ -2380,10 +2428,20 @@ function TurnFoldTimelineRow({ row }: { row: Extract<TimelineRow, { kind: "turn-
 function AssistantTimelineRow({ row }: { row: Extract<TimelineRow, { kind: "message" }> }) {
   const ctx = use(TimelineRowCtx);
   const messageText = row.message.text || (row.message.streaming ? "" : "(empty response)");
+  const finalReply = isChatAnswer(row);
 
   return (
     <>
-      <div className="relative min-w-0 px-1 py-0.5">
+      <div
+        className={cn(
+          // Personal build: the answer is a gray bubble; notes written along
+          // the way sit quietly in the turn's work.
+          "relative min-w-0",
+          finalReply
+            ? "w-fit max-w-full rounded-2xl rounded-bl-md bg-accent px-4 py-2.5"
+            : "px-1 py-0.5 opacity-75",
+        )}
+      >
         <MessageAuthorHeading>T3 Code</MessageAuthorHeading>
         <AssistantCitationSource
           messageId={row.message.id}
@@ -2411,15 +2469,17 @@ function AssistantTimelineRow({ row }: { row: Extract<TimelineRow, { kind: "mess
           resolvedTheme={ctx.resolvedTheme}
           onOpenTurnDiff={ctx.onOpenTurnDiff}
         />
-        {row.showAssistantMeta ? (
-          <AssistantMessageMeta
-            className="mt-1.5"
-            message={row.message}
-            showCopyButton={row.showAssistantCopyButton}
-            copyStreaming={row.assistantCopyStreaming}
-          />
-        ) : null}
       </div>
+      {row.showAssistantMeta ? (
+        <AssistantMessageMeta
+          className="mt-1 px-1"
+          message={row.message}
+          showCopyButton={row.showAssistantCopyButton}
+          copyStreaming={row.assistantCopyStreaming}
+          // Personal build: shown all the time, so the answer doesn't end in a gap.
+          alwaysVisible
+        />
+      ) : null}
     </>
   );
 }
@@ -2524,6 +2584,91 @@ function ProposedPlanTimelineRow({
         cwd={ctx.markdownCwd}
         workspaceRoot={ctx.workspaceRoot}
       />
+    </div>
+  );
+}
+
+// Personal build: a turn's single work line. Live while the agent works
+// ("Reading bin.ts · 12s"), "Worked for …" once it settles. Clicking it shows or
+// hides the turn's work right below it.
+function ChatWorkTimelineRow({ row }: { row: Extract<TimelineRow, { kind: "chat-work" }> }) {
+  const ctx = use(TimelineRowCtx);
+  const { isCompacting, isPreparingWorktree, backgroundWorktreeSetup } =
+    use(TimelineRowActivityCtx);
+  const turnId = row.turnId;
+  const Icon = row.expanded ? ChevronDownIcon : ChevronRightIcon;
+  let content: ReactNode;
+  if (!row.live) {
+    content = <span>{row.label}</span>;
+  } else if (isPreparingWorktree) {
+    content = <span>Setting up worktree…</span>;
+  } else if (isCompacting) {
+    content = <CompactingLabel />;
+  } else {
+    const status =
+      row.status.kind === "tool"
+        ? (row.status.entry.activeLabel ??
+          liveWorkEntryLabel(row.status.entry, ctx.workspaceRoot, true))
+        : row.status.kind === "text"
+          ? row.status.text
+          : "Thinking";
+    content = (
+      <>
+        <span className="min-w-0 truncate">{status}</span>
+        {row.createdAt ? (
+          <span className="shrink-0 opacity-70">
+            <WorkingTimer createdAt={row.createdAt} />
+          </span>
+        ) : null}
+      </>
+    );
+  }
+  return (
+    <div className="flex min-w-0 items-center gap-2">
+      <button
+        type="button"
+        aria-expanded={row.expanded}
+        data-scroll-anchor-ignore
+        disabled={turnId === null}
+        onClick={() => {
+          if (turnId !== null) ctx.onToggleTurnFold(turnId);
+        }}
+        className="flex min-w-0 cursor-pointer select-none items-center gap-2 rounded-md py-0.5 text-muted-foreground text-xs tabular-nums transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/70 disabled:cursor-default"
+      >
+        {content}
+        {turnId !== null ? <Icon className="size-3.5 shrink-0" /> : null}
+      </button>
+      {row.live && backgroundWorktreeSetup ? (
+        <BackgroundWorktreeSetupChip snapshot={backgroundWorktreeSetup} />
+      ) : null}
+    </div>
+  );
+}
+
+// Personal build: while the agent works, a typing bubble sits where its answer
+// will appear.
+function ChatTypingTimelineRow() {
+  return (
+    <div className="flex w-fit items-center rounded-2xl rounded-bl-md bg-accent px-4 py-3">
+      <TypingDots />
+    </div>
+  );
+}
+
+// Personal build: something that happened between turns, such as a background
+// job finishing. A small centered line; clicking it shows the job's output.
+function ChatEventTimelineRow({ row }: { row: Extract<TimelineRow, { kind: "work-toggle" }> }) {
+  const ctx = use(TimelineRowCtx);
+  return (
+    <div className="flex justify-center">
+      <button
+        type="button"
+        aria-expanded={row.expanded}
+        onClick={() => ctx.onToggleWorkGroup(row.groupId, row.id)}
+        className="max-w-[80%] cursor-pointer truncate rounded-full px-3 py-0.5 text-muted-foreground text-xs transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/70"
+      >
+        {row.summary}
+      </button>
     </div>
   );
 }

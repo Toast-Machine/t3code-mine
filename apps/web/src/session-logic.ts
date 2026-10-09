@@ -9,6 +9,7 @@ import * as Schema from "effect/Schema";
 import * as Arr from "effect/Array";
 import { shallow } from "zustand/vanilla/shallow";
 import { isBackgroundTaskActivity } from "@t3tools/client-runtime/state/subagentRuntime";
+import { describeClaudeToolStep } from "./claudeToolSteps";
 import {
   commandDetailRepeatsCommand,
   extractCommandOutputText,
@@ -87,6 +88,10 @@ export interface WorkLogEntry {
    * direct spawns. The row ("Kicked off N subagents") derives its live
    * status and member list from the agent panel model at render time.
    */
+  /** Personal build: present-tense label for the live work line ("Reading bin.ts"). */
+  activeLabel?: string;
+  /** Shell/monitor/plan tasks: ordinary work-log rows, never spawn CTAs. */
+  isBackgroundTask?: boolean;
   agentSpawn?: {
     /** Workflow coordinator taskId, or null for a direct-spawn batch. */
     workflowId: string | null;
@@ -101,8 +106,6 @@ interface DerivedWorkLogEntry extends WorkLogEntry {
   [workLogCollapseKey]?: string;
   toolCallId?: string;
   isWorkflowCoordinator?: boolean;
-  /** Shell/monitor/plan tasks: ordinary work-log rows, never spawn CTAs. */
-  isBackgroundTask?: boolean;
 }
 
 const derivedWorkLogEntryByActivity = new WeakMap<
@@ -622,6 +625,17 @@ function toDerivedWorkLogEntry(activity: OrchestrationThreadActivity): DerivedWo
   }
   if (title) {
     entry.toolTitle = title;
+  }
+  // Personal build: name Claude's built-in tools instead of "Tool call".
+  const claudeStep = isTaskActivity ? null : describeClaudeToolStep(payload);
+  if (claudeStep) {
+    const label = claudeStep.target ? `${claudeStep.label} ${claudeStep.target}` : claudeStep.label;
+    entry.label = label;
+    entry.toolTitle = label;
+    entry.activeLabel = claudeStep.target
+      ? `${claudeStep.activeLabel} ${claudeStep.target}`
+      : claudeStep.activeLabel;
+    delete entry.detail;
   }
   if (toolPresentation.toolSurface) {
     entry.toolSurface = toolPresentation.toolSurface;

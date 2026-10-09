@@ -9850,6 +9850,7 @@ export default function ChatView(props: ChatViewProps) {
             <div className="relative flex min-h-0 flex-1 flex-col bg-background">
               {/* Messages — LegendList handles virtualization and scrolling internally */}
               <MessagesTimeline
+                chatStyle
                 citationRequest={paintOnlyDisplayedTimeline ? null : citationRequest}
                 citationHistoryLoading={threadDetailLoading}
                 {...(!paintOnlyDisplayedTimeline

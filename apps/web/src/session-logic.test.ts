@@ -1522,11 +1522,11 @@ describe("deriveWorkLogEntries", () => {
     expect(entries[0]).toMatchObject({
       id: "tool-complete",
       createdAt: "2026-02-23T00:00:03.000Z",
-      label: "Tool call completed",
-      detail: 'Read: {"file_path":"/tmp/app.ts"}',
+      // Personal build: Claude's Read is named from its input (claudeToolSteps.ts).
+      label: "Read app.ts",
       command: "sed -n 1,40p /tmp/app.ts",
       itemType: "dynamic_tool_call",
-      toolTitle: "Tool call",
+      toolTitle: "Read app.ts",
     });
   });
 
