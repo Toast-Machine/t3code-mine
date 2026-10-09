@@ -51,7 +51,11 @@ import {
   markdownImageSourceFragment,
 } from "@t3tools/client-runtime/markdown-images";
 import { inlineCodeFilePathCandidate } from "@t3tools/client-runtime/markdown-links";
-import { mediaFileReference, mediaUrlReference } from "@t3tools/client-runtime/media-reference";
+import {
+  mediaFileReference,
+  mediaReferenceFileName,
+  mediaUrlReference,
+} from "@t3tools/client-runtime/media-reference";
 import { mediaKindFromPath, mediaMimeTypeFromExtension } from "@t3tools/shared/filePreview";
 import * as Cause from "effect/Cause";
 import { AsyncResult } from "effect/unstable/reactivity";
@@ -1633,7 +1637,35 @@ function ChatMarkdownVideo(props: {
   readonly mediaIdentity?: string | undefined;
   readonly actionsSource?: MediaActionSource | undefined;
   readonly onRetry?: (() => Promise<unknown>) | undefined;
+  readonly srcFragment?: string | undefined;
+  readonly onImageExpand?: ((preview: ExpandedImagePreview) => void) | undefined;
 }) {
+  // Personal build: like images, a chat video shows its first frame and opens
+  // in the lightbox, where it plays and the arrows reach the chat's other media.
+  const onImageExpand = props.onImageExpand;
+  const source = props.actionsSource;
+  const onOpen =
+    onImageExpand && source && (props.src !== null || source.asset)
+      ? () => {
+          const name =
+            props.alt.trim() ||
+            (source.reference ? mediaReferenceFileName(source.reference) : undefined) ||
+            "video";
+          onImageExpand({
+            images: [
+              {
+                src: source.asset ? null : props.src,
+                name,
+                type: "video",
+                ...(props.originalUrl ? { originalUrl: props.originalUrl } : {}),
+                ...(props.srcFragment ? { srcFragment: props.srcFragment } : {}),
+                actionsSource: { ...source, name },
+              },
+            ],
+            index: 0,
+          });
+        }
+      : undefined;
   return (
     <MediaVideoPlayer
       key={props.mediaIdentity ?? props.copyMarkdown ?? props.src}
@@ -1654,6 +1686,7 @@ function ChatMarkdownVideo(props: {
       )}
       onRetry={props.onRetry}
       actionsSource={props.actionsSource}
+      onOpen={onOpen}
     />
   );
 }
@@ -1756,6 +1789,8 @@ export const ChatMarkdownAssetImage = memo(function ChatMarkdownAssetImage(props
         mediaIdentity={JSON.stringify([props.environmentId, props.resource, props.srcFragment])}
         onRetry={refreshAssetUrl}
         actionsSource={actionsSource}
+        srcFragment={props.srcFragment}
+        onImageExpand={props.onImageExpand}
       />
     );
   }
@@ -3252,6 +3287,7 @@ const CHAT_MARKDOWN_COMPONENTS = {
             originalUrl={originalUrl}
             style={authoredSizeStyle}
             actionsSource={actionsSource}
+            onImageExpand={imageExpand}
           />
         );
       }
