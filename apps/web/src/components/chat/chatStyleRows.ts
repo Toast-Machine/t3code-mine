@@ -108,6 +108,11 @@ export function applyChatStyleRows(
   let opener: Row | null = null;
   // Set once the running turn begins; its last block is the live one.
   let live: { createdAt: string | null } | null = null;
+  // The answer always comes last in its turn: work the agent did after its final
+  // text (a last check, a trailing command) folds into the line above it, and the
+  // answer waits until the turn's next boundary.
+  // Typed through `as` so control flow doesn't pin it to null; closures assign it.
+  let pendingAnswer = null as Extract<Row, { kind: "message" }> | null;
 
   const toggleIdFor = (first: Row) => `chat-work:${opener?.id ?? first.id}`;
 
@@ -135,6 +140,20 @@ export function applyChatStyleRows(
     block = [];
   };
 
+  const flushAnswer = () => {
+    if (!pendingAnswer) return;
+    const answer = pendingAnswer;
+    pendingAnswer = null;
+    const lastWorkAt = block.at(-1)?.createdAt ?? null;
+    closeBlock(
+      lastWorkAt && answer.createdAt && lastWorkAt > answer.createdAt
+        ? lastWorkAt
+        : answer.createdAt,
+    );
+    result.push(answer);
+    opener = answer;
+  };
+
   const finishLive = () => {
     if (!live) return;
     const toggleId = `chat-work:${opener?.id ?? "live"}`;
@@ -157,7 +176,22 @@ export function applyChatStyleRows(
 
   for (const row of rows) {
     if (row.kind === "turn-fold" || row.kind === "thinking") continue;
+    if (row.kind === "assistant-meta" && pendingAnswer) {
+      // The copy button and time sit right under the answer.
+      pendingAnswer = {
+        ...pendingAnswer,
+        showAssistantMeta: true,
+        showAssistantCopyButton: row.showAssistantCopyButton,
+      };
+      continue;
+    }
+    if (isChatAnswerRow(row) && row.kind === "message") {
+      flushAnswer();
+      pendingAnswer = row;
+      continue;
+    }
     if (row.kind === "working") {
+      flushAnswer();
       live = { createdAt: row.createdAt };
       continue;
     }
@@ -170,17 +204,20 @@ export function applyChatStyleRows(
       continue;
     }
     if (row.kind === "queued-message") {
+      flushAnswer();
       finishLive();
       result.push(row);
       continue;
     }
     // Something was said or happened: the work so far closes into its own line.
-    closeBlock(row.createdAt);
+    if (pendingAnswer) flushAnswer();
+    else closeBlock(row.createdAt);
     if (isQuestionReplyRow(row)) result.push({ ...row, chatReply: true });
     else if (isBackgroundEventRow(row)) result.push({ ...row, chatEvent: true });
     else result.push(row);
     opener = row;
   }
+  flushAnswer();
   if (live) finishLive();
   else closeBlock(null);
   return result;

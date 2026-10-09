@@ -171,4 +171,15 @@ describe("applyChatStyleRows", () => {
     });
     expect(settledRows(settledTurn, open)[1]).toMatchObject({ live: false, expanded: true });
   });
+
+  it("keeps the answer last when the agent worked after writing it", () => {
+    const entries = [...settledTurn, tool("check", "git status", 5)];
+    const rows = settledRows(entries);
+    expect(rows.map((row) => row.kind)).toEqual(["message", "chat-work", "message"]);
+    expect(rows[2]).toMatchObject({ id: "reply", showAssistantMeta: true });
+    const open = settledRows(entries, new Set(["chat-work:user"]));
+    expect(open.at(-1)).toMatchObject({ id: "reply" });
+    expect(open.some((row) => row.id === "check")).toBe(true);
+    expect(open.some((row) => row.kind === "assistant-meta")).toBe(false);
+  });
 });

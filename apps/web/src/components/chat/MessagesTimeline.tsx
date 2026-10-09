@@ -2016,9 +2016,10 @@ function MessageAuthorHeading({ children }: { children: string }) {
 }
 
 // Personal build: your messages are a theme-color bubble. The overrides make the
-// text, chips, and borders inside it read light on the theme color.
+// text, chips, borders, and controls (such as "Show full message") inside it read
+// light on the theme color.
 const USER_BUBBLE_CLASS_NAME =
-  "rounded-2xl rounded-br-md bg-message px-4 py-2.5 text-message-foreground [--contrast-message-foreground:var(--message-action-foreground)] [--message-surface:var(--message-action)] [--contrast-foreground:var(--message-action-foreground)] [--foreground:var(--message-action-foreground)] [--contrast-border:color-mix(in_srgb,var(--message-action-foreground)_35%,transparent)]";
+  "rounded-2xl rounded-br-md bg-message px-4 py-2.5 text-message-foreground [--contrast-message-foreground:var(--message-action-foreground)] [--message-surface:var(--message-action)] [--contrast-foreground:var(--message-action-foreground)] [--foreground:var(--message-action-foreground)] [--contrast-border:color-mix(in_srgb,var(--message-action-foreground)_35%,transparent)] [--contrast-muted-foreground:color-mix(in_srgb,var(--message-action-foreground)_80%,transparent)] [--accent:color-mix(in_srgb,var(--message-action-foreground)_14%,transparent)]";
 
 function UserTimelineRow({ row }: { row: Extract<TimelineRow, { kind: "message" }> }) {
   const ctx = use(TimelineRowCtx);
