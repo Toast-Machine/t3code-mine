@@ -2603,13 +2603,12 @@ const make = Effect.gen(function* () {
       }
 
       const activities = runtimeEventToActivities(activityEvent, taskTitle);
-      // Personal build: the sidebar's live step ("Running git").
+      // Personal build: the sidebar's live step ("Running git"). Updates only:
+      // a completed step's payload can lack the command its updates carried.
       for (const activity of activities) {
         if (
           activity.turnId !== null &&
-          (activity.kind === "tool.updated" ||
-            activity.kind === "tool.completed" ||
-            activity.kind === "task.progress")
+          (activity.kind === "tool.updated" || activity.kind === "task.progress")
         ) {
           threadPlanProgress.recordLiveActivity(thread.id, activity);
         }

@@ -54,6 +54,20 @@ const isAgentWorkRow = (row: Row) =>
     (row.message.role === "reasoning" ||
       (row.message.role === "assistant" && !isChatAnswerRow(row))));
 
+/** The provider turn a row belongs to; null for rows that don't say. */
+function rowTurnId(row: Row): string | null {
+  switch (row.kind) {
+    case "message":
+      return row.message.role === "user" ? null : (row.message.turnId ?? null);
+    case "work":
+      return row.groupedEntries[0]?.turnId ?? null;
+    case "work-live":
+      return row.entry.turnId ?? null;
+    default:
+      return null;
+  }
+}
+
 /** The newest thing the running turn is doing, for the live work line. */
 export function deriveChatWorkStatus(rows: ReadonlyArray<Row>): ChatWorkStatus {
   for (let index = rows.length - 1; index >= 0; index -= 1) {
@@ -113,6 +127,10 @@ export function applyChatStyleRows(
   // answer waits until the turn's next boundary.
   // Typed through `as` so control flow doesn't pin it to null; closures assign it.
   let pendingAnswer = null as Extract<Row, { kind: "message" }> | null;
+  // The turn the open block's work belongs to. Like upstream, each turn folds
+  // on its own: a turn the agent starts without you (a Codex continuation)
+  // never folds into the line above the previous turn's answer.
+  let blockTurnId: string | null = null;
 
   const toggleIdFor = (first: Row) => `chat-work:${opener?.id ?? first.id}`;
 
@@ -138,6 +156,7 @@ export function applyChatStyleRows(
     });
     if (expanded) result.push(...block);
     block = [];
+    blockTurnId = null;
   };
 
   const flushAnswer = () => {
@@ -174,7 +193,15 @@ export function applyChatStyleRows(
     live = null;
   };
 
-  for (const row of rows) {
+  // Like upstream, while the agent works everything after your latest message
+  // is still in progress: a note there is never the answer, even if a turn's
+  // lifecycle lags behind the working state.
+  const working = rows.some((row) => row.kind === "working");
+  const latestUserIndex = rows.findLastIndex(
+    (row) => row.kind === "message" && row.message.role === "user",
+  );
+
+  for (const [index, row] of rows.entries()) {
     if (row.kind === "turn-fold" || row.kind === "thinking") continue;
     if (row.kind === "assistant-meta" && pendingAnswer) {
       // The copy button and time sit right under the answer.
@@ -183,6 +210,24 @@ export function applyChatStyleRows(
         showAssistantMeta: true,
         showAssistantCopyButton: row.showAssistantCopyButton,
       };
+      continue;
+    }
+    const turnOfRow = rowTurnId(row);
+    if (turnOfRow !== null) {
+      if (pendingAnswer) {
+        if (pendingAnswer.message.turnId && turnOfRow !== pendingAnswer.message.turnId) {
+          flushAnswer();
+        }
+      } else if (block.length > 0 && blockTurnId !== null && turnOfRow !== blockTurnId) {
+        // A turn that ended without an answer: its work closes on its own,
+        // and the next turn's line starts at its own first row.
+        closeBlock(null);
+        opener = null;
+      }
+    }
+    if (working && index > latestUserIndex && row.kind === "message" && isChatAnswerRow(row)) {
+      block.push({ ...row, showAssistantMeta: false, showAssistantCopyButton: false });
+      blockTurnId = turnOfRow ?? blockTurnId;
       continue;
     }
     if (isChatAnswerRow(row) && row.kind === "message") {
@@ -197,6 +242,7 @@ export function applyChatStyleRows(
     }
     if (isAgentWorkRow(row)) {
       block.push(row);
+      blockTurnId = turnOfRow ?? blockTurnId;
       continue;
     }
     if (row.kind === "worktree-setup") {

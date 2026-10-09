@@ -6,6 +6,8 @@ import { deriveMessagesTimelineRows } from "./MessagesTimeline.logic";
 import { applyChatStyleRows, CHAT_LIVE_WORK_ROW_ID, CHAT_TYPING_ROW_ID } from "./chatStyleRows";
 
 const turnId = TurnId.make("turn-1");
+// The timeline unfolds every turn before the chat pass (see MessagesTimeline).
+const everyTurn = new Set([turnId, TurnId.make("turn-2")]);
 const time = (second: number) => new Date(Date.UTC(2026, 0, 1, 0, 0, second)).toISOString();
 
 function message(
@@ -13,6 +15,7 @@ function message(
   role: "user" | "assistant",
   text: string,
   second: number,
+  turn = turnId,
 ): TimelineEntry {
   return {
     id,
@@ -22,7 +25,7 @@ function message(
       id: MessageId.make(id),
       role,
       text,
-      turnId: role === "user" ? null : turnId,
+      turnId: role === "user" ? null : turn,
       createdAt: time(second),
       updatedAt: time(second),
       streaming: false,
@@ -30,14 +33,20 @@ function message(
   };
 }
 
-function tool(id: string, label: string, second: number, running = false): TimelineEntry {
+function tool(
+  id: string,
+  label: string,
+  second: number,
+  running = false,
+  turn = turnId,
+): TimelineEntry {
   return {
     id,
     kind: "work",
     createdAt: time(second),
     entry: {
       id,
-      turnId,
+      turnId: turn,
       createdAt: time(second),
       label,
       tone: "tool",
@@ -60,7 +69,7 @@ function settledRows(entries: TimelineEntry[], expandedBlockIds: ReadonlySet<str
   const rows = deriveMessagesTimelineRows({
     timelineEntries: entries,
     latestTurn: { turnId, state: "completed", startedAt: time(0), completedAt: time(9) },
-    expandedTurnIds: new Set([turnId]),
+    expandedTurnIds: everyTurn,
     isWorking: false,
     activeTurnStartedAt: null,
     turnDiffSummaries: [],
@@ -73,7 +82,7 @@ function runningRows(entries: TimelineEntry[], expandedBlockIds: ReadonlySet<str
   const rows = deriveMessagesTimelineRows({
     timelineEntries: entries,
     runningTurnId: turnId,
-    expandedTurnIds: new Set([turnId]),
+    expandedTurnIds: everyTurn,
     isWorking: true,
     activeTurnStartedAt: time(0),
     turnDiffSummaries: [],
@@ -181,5 +190,41 @@ describe("applyChatStyleRows", () => {
     expect(open.at(-1)).toMatchObject({ id: "reply" });
     expect(open.some((row) => row.id === "check")).toBe(true);
     expect(open.some((row) => row.kind === "assistant-meta")).toBe(false);
+  });
+
+  it("gives a turn the agent started on its own its own line", () => {
+    const nextTurn = TurnId.make("turn-2");
+    const entries = [
+      ...settledTurn,
+      tool("git", "git status", 6, false, nextTurn),
+      message("summary", "assistant", "Updated the copy.", 8, nextTurn),
+    ];
+    const rows = settledRows(entries);
+    expect(rows.map((row) => row.kind)).toEqual([
+      "message",
+      "chat-work",
+      "message",
+      "chat-work",
+      "message",
+    ]);
+    expect(rows[1]).toMatchObject({ label: "Worked for 4.0s" });
+    expect(rows[2]).toMatchObject({ id: "reply" });
+    expect(rows[3]).toMatchObject({ toggleId: "chat-work:reply", label: "Worked for 4.0s" });
+    expect(rows[4]).toMatchObject({ id: "summary" });
+  });
+
+  it("never treats a note as the answer while the agent is still working", () => {
+    const rows = deriveMessagesTimelineRows({
+      timelineEntries: [...settledTurn.slice(0, 3), tool("test", "vp test run", 3)],
+      // A turn whose lifecycle lags the working state.
+      latestTurn: { turnId, state: "completed", startedAt: time(0), completedAt: time(3) },
+      expandedTurnIds: everyTurn,
+      isWorking: true,
+      activeTurnStartedAt: time(0),
+      turnDiffSummaries: [],
+      supportsConversationRollback: false,
+    });
+    const chat = applyChatStyleRows(rows, { expandedBlockIds: new Set() });
+    expect(chat.map((row) => row.kind)).toEqual(["message", "chat-work", "chat-typing"]);
   });
 });
