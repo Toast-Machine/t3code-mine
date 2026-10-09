@@ -3,9 +3,9 @@
  * shows: a forecast, where the usage went, and when.
  *
  * Providers report only a percentage per window. Sessions carry API-equivalent
- * cost, which tracks how providers meter far better than raw tokens (cached
- * reads are cheap for both). Each session's share of the window's cost,
- * applied to the reported percentage, estimates its share of the limit.
+ * cost, not measured subscription usage. Allocating the reported percentage
+ * by recorded cost is a rough estimate: provider metering and activity missing
+ * from these records can change the actual share attributable to each chat.
  */
 import type { EnvironmentId, UsageBreakdownSession } from "@t3tools/contracts";
 
@@ -33,11 +33,11 @@ export interface LimitForecast {
   /** Projected share used at reset, uncapped. */
   readonly projectedUsedAtReset: number;
   readonly runsOutAtMs: number | null;
-  /** Points per day that would land exactly on 100% at reset. */
+  /** Remaining points spread over days until reset, capped at the amount left. */
   readonly dailyBudget: number;
   readonly averagePerDay: number;
   readonly last24h: number | null;
-  readonly today: number;
+  readonly today: number | null;
   readonly ratePerHour: number;
 }
 
@@ -229,10 +229,10 @@ export function computeLimitInsights(
             : "onTrack",
     projectedUsedAtReset,
     runsOutAtMs,
-    dailyBudget: hoursLeft > 0 ? remaining / (hoursLeft / 24) : remaining,
+    dailyBudget: hoursLeft > 0 ? remaining / Math.max(1, hoursLeft / 24) : 0,
     averagePerDay: averagePerHour * 24,
     last24h,
-    today: toPoints(todayCost),
+    today: totalCostUsd > 0 ? toPoints(todayCost) : null,
     ratePerHour,
   };
 
@@ -401,8 +401,8 @@ function buildInsights(
     insights.push({
       id: "budget",
       tone: "warning",
-      title: `Keep to about ${formatPoints(forecast.dailyBudget)} a day`,
-      body: `That lasts until the reset. You have averaged ${formatPoints(forecast.averagePerDay)} a day so far${
+      title: `Available per day until reset: ${formatPoints(forecast.dailyBudget)}`,
+      body: `This spreads your remaining weekly allowance evenly until reset. You have averaged ${formatPoints(forecast.averagePerDay)} a day so far${
         forecast.last24h !== null
           ? ` and used ${formatPoints(forecast.last24h)} in the last 24 hours`
           : ""
@@ -414,14 +414,14 @@ function buildInsights(
   if (top.share >= 0.2 && chats.length > 1) {
     insights.push({
       id: "top-chat",
-      tone: top.share >= 0.35 ? "warning" : "info",
-      title: `One chat used ${Math.round(top.share * 100)}% of this week's usage`,
-      body: `“${top.title}” in ${top.projectLabel} took about ${formatPoints(top.points)} of your limit on its own. Check whether it was worth that much.`,
+      tone: "info",
+      title: `Largest chat: about ${formatPoints(top.points)} of your weekly limit`,
+      body: `"${top.title}" in ${top.projectLabel}. This estimate is included in the ${formatPoints(usedPercent)} used this week.`,
       session: top.session,
     });
   }
 
-  // Long chats resend their whole history every turn, so each reply costs more.
+  // Compare recorded cost per response without inferring why a chat costs more.
   const typical = median(
     chats.filter((chat) => chat.responses >= 5).map((chat) => chat.pointsPerResponse),
   );
@@ -436,8 +436,8 @@ function buildInsights(
     insights.push({
       id: "long-chat",
       tone: "info",
-      title: `Each reply in “${heavy.title}” costs ${Math.round(heavy.pointsPerResponse / typical)}× your typical chat`,
-      body: "Long conversations resend their whole history with every turn. Starting a fresh chat for a new task resets that cost.",
+      title: `Higher cost per response in "${heavy.title}"`,
+      body: `Recorded cost per response is about ${Math.round(heavy.pointsPerResponse / typical)} times the median across your chats. Model choice, context length, and tools can affect this.`,
       session: heavy.session,
     });
   }
@@ -456,9 +456,9 @@ function buildInsights(
       .map(([origin, points]) => `${origin} ≈${formatPoints(points)}`);
     insights.push({
       id: "outside",
-      tone: outsideShare >= 0.5 ? "warning" : "info",
-      title: `${Math.round(outsideShare * 100)}% of this week ran outside T3 Code`,
-      body: `${sources.join(", ")}. It all draws from the same limit.`,
+      tone: "info",
+      title: `Outside T3 Code: about ${formatPoints(outside.reduce((sum, chat) => sum + chat.points, 0))} of your weekly limit`,
+      body: `${sources.join(", ")}. Included in the estimated usage below.`,
     });
   }
 
@@ -467,8 +467,8 @@ function buildInsights(
     insights.push({
       id: "top-project",
       tone: "info",
-      title: `${topProject.label} took ${Math.round(topProject.share * 100)}% of this week`,
-      body: `${topProject.chats} ${topProject.chats === 1 ? "chat" : "chats"}, about ${formatPoints(topProject.points)} of your limit.`,
+      title: `${topProject.label}: about ${formatPoints(topProject.points)} of your weekly limit`,
+      body: `Estimated across ${topProject.chats} ${topProject.chats === 1 ? "chat" : "chats"}. Included in the ${formatPoints(usedPercent)} used this week.`,
     });
   }
   return insights;

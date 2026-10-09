@@ -70,6 +70,34 @@ describe("computeLimitInsights", () => {
     expect(insights.models).toEqual([{ label: "Opus 4.6", points: 40, share: 1 }]);
   });
 
+  it("expresses a chat's share against the full weekly limit", () => {
+    const insights = computeLimitInsights(window(7, 5 + 35 / 60), [
+      session("big", [[1, 37]]),
+      session("small", [[2, 33]]),
+      session("other", [[3, 30]]),
+    ]);
+    expect(insights.chats[0]?.points).toBeCloseTo(2.59);
+    expect(insights.chats.reduce((sum, chat) => sum + chat.points, 0)).toBeCloseTo(7);
+    expect(insights.forecast.status).toBe("early");
+    expect(insights.forecast.dailyBudget).toBeCloseTo(93 / ((168 - 5 - 35 / 60) / 24));
+    expect(insights.insights.find((insight) => insight.id === "top-chat")).toMatchObject({
+      title: "Largest chat: about 2.6% of your weekly limit",
+      tone: "info",
+    });
+  });
+
+  it("does not report zero daily usage when chat records are missing", () => {
+    const insights = computeLimitInsights(window(7, 48), []);
+    expect(insights.forecast.today).toBeNull();
+    expect(insights.forecast.last24h).toBeNull();
+    expect(insights.chats).toEqual([]);
+  });
+
+  it("keeps the daily allowance within the remaining weekly allowance", () => {
+    expect(computeLimitInsights(window(70, 162), []).forecast.dailyBudget).toBe(30);
+    expect(computeLimitInsights(window(70, 168), []).forecast.dailyBudget).toBe(0);
+  });
+
   it("ignores usage from before the window opened", () => {
     const insights = computeLimitInsights(window(10, 24), [
       session("a", [
@@ -120,7 +148,7 @@ describe("computeLimitInsights", () => {
       session("small", [[2, 2]]),
     ]);
     expect(insights.insights.find((insight) => insight.id === "top-chat")?.title).toBe(
-      "One chat used 80% of this week's usage",
+      "Largest chat: about 40% of your weekly limit",
     );
   });
 });

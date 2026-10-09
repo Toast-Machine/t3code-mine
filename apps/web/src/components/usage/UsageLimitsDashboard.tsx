@@ -401,28 +401,26 @@ function WeeklyLimitView({
       </section>
       <section className="flex flex-col gap-4">
         <SectionHeading
-          title="Where it went"
+          title="Usage breakdown"
           detail={
             <>
-              Estimated since the week started {formatWeekday(target.startMs)}. Each chat's share of
-              this week's API-equivalent cost is applied to the {target.window.usedPercent}% you
-              have used. Usage from other computers or the web app is not visible here.
+              Estimated percentages of your weekly limit since {formatWeekday(target.startMs)}. The{" "}
+              {target.window.usedPercent}% used is divided among recorded chats based on cost.
+              Missing activity can make these estimates too high.
             </>
           }
         />
         {isPending ? (
-          <WhereItWentSkeleton />
+          <UsageBreakdownSkeleton />
         ) : insights.chats.length === 0 ? (
           <Card>
             <p className="text-sm text-muted-foreground">
-              No {target.label} usage found on the selected environments since the week started.
-              {target.window.usedPercent > 0
-                ? " What you have used so far came from somewhere else, such as another computer or the web app."
-                : ""}
+              No {target.label} chat records found for this week in the selected environments. Your
+              provider's reported usage may include activity that is not recorded here.
             </p>
           </Card>
         ) : (
-          <WhereItWent insights={insights} color={color} now={now} />
+          <UsageBreakdown insights={insights} color={color} now={now} />
         )}
       </section>
     </>
@@ -441,10 +439,10 @@ const STATUS: Record<
     readonly icon: typeof CheckCircle2Icon;
   }
 > = {
-  early: { label: "Early in the week", variant: "info", icon: Clock3Icon },
+  early: { label: "Forecast pending", variant: "info", icon: Clock3Icon },
   onTrack: { label: "On track", variant: "success", icon: CheckCircle2Icon },
-  tight: { label: "Cutting it close", variant: "warning", icon: CircleAlertIcon },
-  runsOut: { label: "Will run out early", variant: "error", icon: AlertTriangleIcon },
+  tight: { label: "High projected usage", variant: "warning", icon: CircleAlertIcon },
+  runsOut: { label: "May reach limit before reset", variant: "error", icon: AlertTriangleIcon },
 };
 
 /** The forecast in one sentence, shared by the overview card and the provider tab. */
@@ -462,15 +460,15 @@ function ForecastSentence({
     return (
       <>
         <strong className="font-semibold text-foreground">{target.window.usedPercent}% used</strong>{" "}
-        in the first {formatDuration(now - target.startMs)}. Too early to call a trend; spread
-        evenly, the rest allows about {formatPoints(forecast.dailyBudget)} a day.
+        since the weekly reset {formatDuration(now - target.startMs)} ago. A usage forecast will be
+        available after the first 24 hours.
       </>
     );
   }
   if (forecast.runsOutAtMs !== null) {
     return (
       <>
-        At this pace you will run out{" "}
+        At your current rate, you may reach the weekly limit on{" "}
         <strong className="font-semibold text-foreground">
           {formatWeekdayTime(forecast.runsOutAtMs)}
         </strong>
@@ -480,11 +478,11 @@ function ForecastSentence({
   }
   return (
     <>
-      At this pace you will finish the week with about{" "}
+      At your current rate, you are estimated to have{" "}
       <strong className="font-semibold text-foreground">
         {Math.max(0, Math.round(100 - forecast.projectedUsedAtReset))}% left
-      </strong>
-      .
+      </strong>{" "}
+      when the limit resets.
     </>
   );
 }
@@ -535,7 +533,7 @@ function ForecastCard({
             <span className="text-5xl font-semibold tracking-tight text-foreground tabular-nums">
               {target.window.remainingPercent}%
             </span>
-            <span className="text-base text-muted-foreground">left this week</span>
+            <span className="text-base text-muted-foreground">of weekly limit remaining</span>
           </div>
           <p className="max-w-xl text-sm text-muted-foreground">{headline}</p>
         </div>
@@ -573,14 +571,26 @@ function ForecastCard({
       <BurnChart target={target} insights={insights} color={color} now={now} />
 
       <dl className="grid grid-cols-2 gap-x-6 gap-y-4 border-t border-border/60 pt-5 md:grid-cols-4">
-        <Stat label="Used today" value={`≈${formatPoints(forecast.today)}`} />
         <Stat
-          label="Last 24 hours"
-          value={forecast.last24h === null ? "—" : `≈${formatPoints(forecast.last24h)}`}
+          label="Used today, estimated"
+          value={forecast.today === null ? "Unavailable" : `≈${formatPoints(forecast.today)}`}
         />
-        <Stat label="Average per day" value={formatPoints(forecast.averagePerDay)} />
-        <Stat label="Daily budget to reset" value={formatPoints(forecast.dailyBudget)} />
+        <Stat
+          label="Last 24 hours, estimated"
+          value={forecast.last24h === null ? "Unavailable" : `≈${formatPoints(forecast.last24h)}`}
+        />
+        <Stat
+          label="Average daily use"
+          value={
+            forecast.status === "early" ? "After 24 hours" : formatPoints(forecast.averagePerDay)
+          }
+        />
+        <Stat label="Available per day until reset" value={formatPoints(forecast.dailyBudget)} />
       </dl>
+      <p className="text-xs text-muted-foreground">
+        Percentages are of your full weekly limit. The daily allowance spreads your remaining usage
+        evenly until reset. It is not a separate daily limit.
+      </p>
     </Card>
   );
 }
@@ -648,19 +658,21 @@ function BurnChart({
       ? null
       : hoverMs <= now
         ? (points.toReversed().find((point) => point.atMs <= hoverMs)?.used ?? 0)
-        : Math.min(100, used + forecast.ratePerHour * ((hoverMs - now) / HOUR));
+        : forecast.status === "early"
+          ? null
+          : Math.min(100, used + forecast.ratePerHour * ((hoverMs - now) / HOUR));
 
   return (
     <div className="flex flex-col gap-2">
       <div className="flex flex-wrap items-center gap-x-5 gap-y-1 text-xs text-muted-foreground">
-        <LegendSwatch color={color}>Used so far</LegendSwatch>
+        <LegendSwatch color={color}>Estimated weekly usage</LegendSwatch>
         {forecast.status === "early" ? null : (
           <LegendSwatch color={color} dashed>
-            At this pace
+            Projected usage
           </LegendSwatch>
         )}
         <LegendSwatch color="var(--muted-foreground)" dashed>
-          Even pace
+          Even weekly usage
         </LegendSwatch>
       </div>
       <div className="relative grid grid-cols-[2.5rem_minmax(0,1fr)]">
@@ -786,7 +798,7 @@ function BurnChart({
               )}
               style={{ left: `${x(forecast.runsOutAtMs) / 10}%`, top: 0 }}
             >
-              Runs out {formatWeekdayTime(forecast.runsOutAtMs)}
+              Limit reached {formatWeekdayTime(forecast.runsOutAtMs)}
             </span>
           ) : null}
           {hoverMs !== null && hoverUsed !== null && hover !== null ? (
@@ -799,8 +811,8 @@ function BurnChart({
             >
               <div className="font-medium text-foreground">{formatWeekdayTime(hoverMs)}</div>
               <div className="text-muted-foreground tabular-nums">
-                {hoverMs <= now ? "Used" : "Projected"} {Math.round(hoverUsed)}% · even pace{" "}
-                {Math.round(((hoverMs - startMs) / span) * 100)}%
+                {hoverMs <= now ? "Estimated use" : "Projected use"} {Math.round(hoverUsed)}% · even
+                pace {Math.round(((hoverMs - startMs) / span) * 100)}%
               </div>
             </div>
           ) : null}
@@ -850,10 +862,10 @@ function LegendSwatch({
 }
 
 /* -------------------------------------------------------------------------- */
-/* Where it went                                                               */
+/* Usage breakdown                                                            */
 /* -------------------------------------------------------------------------- */
 
-function WhereItWent({
+function UsageBreakdown({
   insights,
   color,
   now,
@@ -950,12 +962,12 @@ function ProjectsCard({ insights }: { readonly insights: LimitInsights }) {
       <CardTitle
         aside={`${insights.projects.length} ${insights.projects.length === 1 ? "project" : "projects"}`}
       >
-        By project
+        Usage by project
       </CardTitle>
       <div
         className="mb-5 flex h-3 w-full gap-0.5 overflow-hidden rounded-full"
         role="img"
-        aria-label="Share of the limit by project"
+        aria-label="Relative estimated usage by project"
       >
         {rows.map((row) => (
           <div
@@ -1000,7 +1012,7 @@ function ModelsCard({
   const max = insights.models[0]?.points ?? 0;
   return (
     <Card>
-      <CardTitle>By model</CardTitle>
+      <CardTitle>Usage by model</CardTitle>
       <ul className="flex flex-col gap-3.5">
         {insights.models.slice(0, 6).map((model) => (
           <li key={model.label} className="flex flex-col gap-1.5">
@@ -1047,7 +1059,7 @@ function ChatsCard({
         <CardTitle
           aside={`${insights.chats.length} ${insights.chats.length === 1 ? "chat" : "chats"} this week`}
         >
-          Chats that used the most
+          Usage by chat
         </CardTitle>
       </div>
       <ol className="flex flex-col">
@@ -1117,7 +1129,7 @@ function ChatRow({
           <span className="truncate">{chat.projectLabel}</span>
           <span aria-hidden>·</span>
           <span className="shrink-0 tabular-nums">
-            {chat.responses} {chat.responses === 1 ? "reply" : "replies"}
+            {chat.responses} {chat.responses === 1 ? "response" : "responses"}
           </span>
           {chat.models.length > 0 ? (
             <>
@@ -1194,7 +1206,7 @@ function HeatmapCard({
       : "";
   return (
     <Card>
-      <CardTitle aside={caption}>When you used it</CardTitle>
+      <CardTitle aside={caption}>Usage by day and hour</CardTitle>
       <div className="grid grid-cols-[3.5rem_minmax(0,1fr)_3.5rem] items-center gap-x-3 gap-y-1">
         <span />
         <div className="grid grid-cols-24 text-2xs text-muted-foreground">
@@ -1269,7 +1281,7 @@ function HeatmapRow({
   );
 }
 
-function WhereItWentSkeleton() {
+function UsageBreakdownSkeleton() {
   return (
     <div className="flex flex-col gap-4">
       <div className="grid gap-4 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
