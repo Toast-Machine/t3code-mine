@@ -775,6 +775,21 @@ export const MessagesTimeline = memo(function MessagesTimeline({
         : new Set(liveAgentTaskKey.length > 0 ? liveAgentTaskKey.split("\n") : []),
     [liveAgentTaskKey],
   );
+  const everyTurnId = useMemo(
+    () =>
+      new Set(
+        timelineEntries.flatMap((entry) => {
+          const turnId =
+            entry.kind === "message"
+              ? entry.message.turnId
+              : entry.kind === "work"
+                ? entry.entry.turnId
+                : null;
+          return turnId ? [turnId] : [];
+        }),
+      ),
+    [timelineEntries],
+  );
   const rawRows = useMemo(() => {
     const previous = rowsProjectionRef.current;
     const projection = deriveMessagesTimelineRowsWithState(
@@ -782,7 +797,8 @@ export const MessagesTimeline = memo(function MessagesTimeline({
         timelineEntries,
         latestTurn,
         runningTurnId,
-        expandedTurnIds: paintedExpandedTurnIds,
+        // Personal build: the chat layout folds work itself (see chatStyleRows.ts).
+        expandedTurnIds: chatStyle ? everyTurnId : paintedExpandedTurnIds,
         expandedWorkGroupIds: paintedExpandedWorkGroupIds,
         isWorking,
         activeTurnStartedAt,
@@ -799,13 +815,11 @@ export const MessagesTimeline = memo(function MessagesTimeline({
     rowsProjectionRef.current = { threadKey: listIdentityKey, workspaceRoot, projection };
     // Personal build: chat-style layout (see chatStyleRows.ts).
     return chatStyle
-      ? applyChatStyleRows(projection.rows, {
-          activeTurnId: isWorking ? (runningTurnId ?? latestTurn?.turnId ?? null) : null,
-          expandedTurnIds: paintedExpandedTurnIds,
-        })
+      ? applyChatStyleRows(projection.rows, { expandedBlockIds: paintedExpandedWorkGroupIds })
       : projection.rows;
   }, [
     chatStyle,
+    everyTurnId,
     rowsProjectionRef,
     listIdentityKey,
     workspaceRoot,
@@ -2603,7 +2617,6 @@ function ChatWorkTimelineRow({ row }: { row: Extract<TimelineRow, { kind: "chat-
   const ctx = use(TimelineRowCtx);
   const { isCompacting, isPreparingWorktree, backgroundWorktreeSetup } =
     use(TimelineRowActivityCtx);
-  const turnId = row.turnId;
   const Icon = row.expanded ? ChevronDownIcon : ChevronRightIcon;
   let content: ReactNode;
   if (!row.live) {
@@ -2637,14 +2650,11 @@ function ChatWorkTimelineRow({ row }: { row: Extract<TimelineRow, { kind: "chat-
         type="button"
         aria-expanded={row.expanded}
         data-scroll-anchor-ignore
-        disabled={turnId === null}
-        onClick={() => {
-          if (turnId !== null) ctx.onToggleTurnFold(turnId);
-        }}
-        className="flex min-w-0 cursor-pointer select-none items-center gap-2 rounded-md py-0.5 text-muted-foreground text-xs tabular-nums transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/70 disabled:cursor-default"
+        onClick={() => ctx.onToggleWorkGroup(row.toggleId, row.id)}
+        className="flex min-w-0 cursor-pointer select-none items-center gap-2 rounded-md py-0.5 text-muted-foreground text-xs tabular-nums transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/70"
       >
         {content}
-        {turnId !== null ? <Icon className="size-3.5 shrink-0" /> : null}
+        <Icon className="size-3.5 shrink-0" />
       </button>
       {row.live && backgroundWorktreeSetup ? (
         <BackgroundWorktreeSetupChip snapshot={backgroundWorktreeSetup} />

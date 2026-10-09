@@ -56,125 +56,92 @@ const settledTurn = [
   message("reply", "assistant", "Fixed. The zoom bar no longer flashes.", 4),
 ];
 
-function settledRows(expanded: boolean) {
+function settledRows(entries: TimelineEntry[], expandedBlockIds: ReadonlySet<string> = new Set()) {
   const rows = deriveMessagesTimelineRows({
-    timelineEntries: settledTurn,
-    latestTurn: { turnId, state: "completed", startedAt: time(0), completedAt: time(5) },
-    expandedTurnIds: expanded ? new Set([turnId]) : new Set(),
+    timelineEntries: entries,
+    latestTurn: { turnId, state: "completed", startedAt: time(0), completedAt: time(9) },
+    expandedTurnIds: new Set([turnId]),
     isWorking: false,
     activeTurnStartedAt: null,
     turnDiffSummaries: [],
     supportsConversationRollback: false,
   });
-  return applyChatStyleRows(rows, {
-    activeTurnId: null,
-    expandedTurnIds: expanded ? new Set([turnId]) : new Set(),
-  });
+  return applyChatStyleRows(rows, { expandedBlockIds });
 }
 
+function runningRows(entries: TimelineEntry[], expandedBlockIds: ReadonlySet<string> = new Set()) {
+  const rows = deriveMessagesTimelineRows({
+    timelineEntries: entries,
+    runningTurnId: turnId,
+    expandedTurnIds: new Set([turnId]),
+    isWorking: true,
+    activeTurnStartedAt: time(0),
+    turnDiffSummaries: [],
+    supportsConversationRollback: false,
+  });
+  return applyChatStyleRows(rows, { expandedBlockIds });
+}
+
+const question: TimelineEntry = {
+  id: "question",
+  kind: "work",
+  createdAt: time(2),
+  entry: {
+    id: "question",
+    turnId,
+    createdAt: time(2),
+    label: "Answered a question",
+    tone: "info",
+    questionAnswer: {
+      requestId: ApprovalRequestId.make("request-1"),
+      questionTextById: { q1: "Which phone should I use?" },
+      answers: { q1: "My real phone" },
+      attachmentsByQuestionId: {},
+    },
+  },
+};
+
 describe("applyChatStyleRows", () => {
-  it("shows a settled turn as one work line followed by the answer", () => {
-    const rows = settledRows(false);
+  it("closes the work before the answer into one line", () => {
+    const rows = settledRows(settledTurn);
     expect(rows.map((row) => row.kind)).toEqual(["message", "chat-work", "message"]);
-    expect(rows[1]).toMatchObject({ live: false, expanded: false, turnId });
-    expect(rows[2]).toMatchObject({ id: "reply", showAssistantMeta: true });
+    expect(rows[1]).toMatchObject({ live: false, expanded: false, label: "Worked for 4.0s" });
   });
 
-  it("opens a settled turn's work in place, between the work line and the answer", () => {
-    const rows = settledRows(true);
+  it("opens one line's work in place, between that line and what closed it", () => {
+    const rows = settledRows(settledTurn, new Set(["chat-work:user"]));
     expect(rows[1]).toMatchObject({ kind: "chat-work", expanded: true });
-    expect(rows.at(-1)).toMatchObject({ id: "reply" });
-    expect(rows.some((row) => row.id === "note")).toBe(true);
-    expect(rows.some((row) => row.kind === "turn-fold")).toBe(false);
+    expect(rows.slice(2).map((row) => row.id)).toEqual(["read", "note", "test", "reply"]);
   });
 
-  it("keeps a running turn to one live work line that names the current step", () => {
-    const entries = [...settledTurn.slice(0, 3), tool("test", "vp test run", 3, true)];
-    const derive = (expanded: boolean) =>
-      applyChatStyleRows(
-        deriveMessagesTimelineRows({
-          timelineEntries: entries,
-          runningTurnId: turnId,
-          isWorking: true,
-          activeTurnStartedAt: time(0),
-          turnDiffSummaries: [],
-          supportsConversationRollback: false,
-        }),
-        { activeTurnId: turnId, expandedTurnIds: expanded ? new Set([turnId]) : new Set() },
-      );
-
-    const collapsed = derive(false);
-    expect(collapsed.map((row) => row.id)).toEqual([
-      "user",
-      CHAT_LIVE_WORK_ROW_ID,
-      CHAT_TYPING_ROW_ID,
+  it("closes a line each time you answer a question", () => {
+    const entries = [
+      settledTurn[0]!,
+      tool("read", "cat ZoomBar.tsx", 1),
+      question,
+      tool("test", "vp test run", 3),
+      settledTurn[4]!,
+    ];
+    const rows = settledRows(entries);
+    expect(rows.map((row) => row.kind)).toEqual([
+      "message",
+      "chat-work",
+      "work",
+      "chat-work",
+      "message",
     ]);
-    expect(collapsed[1]).toMatchObject({
-      kind: "chat-work",
-      live: true,
-      expanded: false,
-      status: { kind: "tool", entry: { id: "test" } },
-    });
-
-    // Opening it lists the live work under the line, which stays in place, and
-    // the typing bubble stays last.
-    const expanded = derive(true);
-    expect(expanded[1]).toMatchObject({ kind: "chat-work", expanded: true });
-    expect(expanded.at(-1)).toMatchObject({ kind: "chat-typing" });
-    expect(expanded.some((row) => row.id === "note")).toBe(true);
-    expect(expanded.some((row) => row.kind === "working" || row.kind === "thinking")).toBe(false);
+    expect(rows[2]).toMatchObject({ id: "question", chatReply: true });
+    expect(rows[1]).toMatchObject({ toggleId: "chat-work:user" });
+    expect(rows[3]).toMatchObject({ toggleId: "chat-work:question" });
   });
 
-  it("keeps the agent's question and your answer visible as a reply", () => {
-    const question: TimelineEntry = {
-      id: "question",
-      kind: "work",
-      createdAt: time(2),
-      entry: {
-        id: "question",
-        turnId,
-        createdAt: time(2),
-        label: "Answered a question",
-        tone: "info",
-        questionAnswer: {
-          requestId: ApprovalRequestId.make("request-1"),
-          questionTextById: { q1: "Which phone should I use?" },
-          answers: { q1: "My real phone" },
-          attachmentsByQuestionId: {},
-        },
-      },
-    };
-    const rows = applyChatStyleRows(
-      deriveMessagesTimelineRows({
-        timelineEntries: [...settledTurn.slice(0, 2), question, ...settledTurn.slice(2)],
-        latestTurn: { turnId, state: "completed", startedAt: time(0), completedAt: time(5) },
-        isWorking: false,
-        activeTurnStartedAt: null,
-        turnDiffSummaries: [],
-        supportsConversationRollback: false,
-      }),
-      { activeTurnId: null, expandedTurnIds: new Set() },
-    );
-    expect(rows.find((row) => row.id === "question")).toMatchObject({ chatReply: true });
-  });
-
-  it("folds work from before a message you sent mid-turn under its own line", () => {
+  it("closes a line when you send a message mid-turn, and keeps the newest one live", () => {
     const entries = [
       ...settledTurn.slice(0, 3),
       message("steer", "user", "Also check the slider", 4),
       tool("slider", "vp test run slider", 5, true),
     ];
-    const rows = applyChatStyleRows(
-      deriveMessagesTimelineRows({
-        timelineEntries: entries,
-        runningTurnId: turnId,
-        isWorking: true,
-        activeTurnStartedAt: time(0),
-        turnDiffSummaries: [],
-        supportsConversationRollback: false,
-      }),
-      { activeTurnId: turnId, expandedTurnIds: new Set() },
-    );
+    const rows = runningRows(entries);
     expect(rows.map((row) => row.kind)).toEqual([
       "message",
       "chat-work",
@@ -182,6 +149,26 @@ describe("applyChatStyleRows", () => {
       "chat-work",
       "chat-typing",
     ]);
-    expect(rows[1]).toMatchObject({ label: "Work so far", live: false, turnId });
+    expect(rows[1]).toMatchObject({ live: false, toggleId: "chat-work:user" });
+    expect(rows[3]).toMatchObject({
+      id: CHAT_LIVE_WORK_ROW_ID,
+      live: true,
+      toggleId: "chat-work:steer",
+      status: { kind: "tool", entry: { id: "slider" } },
+    });
+    expect(rows[4]).toMatchObject({ id: CHAT_TYPING_ROW_ID });
+  });
+
+  it("keeps a live line's open state when the turn settles", () => {
+    const open = new Set(["chat-work:user"]);
+    const running = runningRows(
+      [...settledTurn.slice(0, 3), tool("test", "vp test run", 3, true)],
+      open,
+    );
+    expect(running.find((row) => row.kind === "chat-work")).toMatchObject({
+      live: true,
+      expanded: true,
+    });
+    expect(settledRows(settledTurn, open)[1]).toMatchObject({ live: false, expanded: true });
   });
 });

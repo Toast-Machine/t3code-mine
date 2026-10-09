@@ -1,18 +1,19 @@
-// Personal build: chat-style timeline. Rearranges the rows the timeline already
-// derives into a small model, so a conversation reads as a plain back-and-forth:
+// Personal build: chat-style timeline. Two speakers, one rule:
 //
-// - Your message, then one work line per turn, then the answer.
-// - The work line is live while the agent works ("Reading bin.ts · 12s") and
-//   becomes "Worked for 1m 21s" when it settles. It never moves; opening it
-//   lists the turn's work right under it. Meanwhile a typing bubble sits where
-//   the answer will appear.
-// - Bookkeeping the provider reports outside a turn's work (for example
-//   "Claude system message …") goes inside that work, never between the two.
-// - A background job finishing is an event: a small line of its own.
+//   Every time you say something (a message, a message sent mid-turn, or your
+//   answer to the agent's question), the agent's work up to that point closes
+//   into one "Worked for …" line.
 //
-// Nothing is dropped. Every hidden row is one toggle away, and the toggles reuse
-// the existing per-turn expansion state.
-import type { TurnId } from "@t3tools/contracts";
+// So the agent's side is always some work lines, each closed by something you
+// said, and then its answer in a bubble. While it works, the newest line is
+// live ("Reading bin.ts · 12s") and a typing bubble sits where the answer will
+// appear. Each line opens to just its own part of the work, in place. A
+// background job finishing is an event: a small centered line.
+//
+// The timeline hands this pass every row (no upstream folds), and the lines'
+// open state lives in the existing per-group expansion set, keyed by the
+// message that opened each block.
+import { formatDuration } from "@t3tools/shared/orchestrationTiming";
 import * as Equal from "effect/Equal";
 
 import type { WorkLogEntry } from "../../session-logic";
@@ -30,19 +31,28 @@ type Row = MessagesTimelineRow;
 
 const THINKING: ChatWorkStatus = { kind: "thinking" };
 
-const isUserMessage = (row: Row) => row.kind === "message" && row.message.role === "user";
-
-/** Your answer to a question the agent asked; shown as a reply, never folded away. */
+/** Your answer to a question the agent asked; shown as a reply. */
 export const isQuestionReplyRow = (row: Row): row is Extract<Row, { kind: "work" }> =>
   row.kind === "work" && row.groupedEntries.length === 1 && !!row.groupedEntries[0]!.questionAnswer;
 
-/** Rows that belong inside a turn's work rather than in the conversation. */
-const isWorkRow = (row: Row) =>
+const isBackgroundEventRow = (row: Row): row is Extract<Row, { kind: "work-toggle" }> =>
+  row.kind === "work-toggle" && !!row.isBackgroundEvent;
+
+/** The agent's final reply for a turn; everything else it writes is a note in its work. */
+export const isChatAnswerRow = (row: Row) =>
+  row.kind === "message" &&
+  row.message.role === "assistant" &&
+  (row.showAssistantMeta || row.metaMovedBelowTools === true);
+
+/** Rows that are the agent working: tools, thinking, notes, and provider bookkeeping. */
+const isAgentWorkRow = (row: Row) =>
   (row.kind === "work" && !isQuestionReplyRow(row)) ||
-  row.kind === "work-toggle" ||
+  (row.kind === "work-toggle" && !isBackgroundEventRow(row)) ||
   row.kind === "work-live" ||
   row.kind === "activity-group" ||
-  (row.kind === "message" && row.message.role === "reasoning");
+  (row.kind === "message" &&
+    (row.message.role === "reasoning" ||
+      (row.message.role === "assistant" && !isChatAnswerRow(row))));
 
 /** The newest thing the running turn is doing, for the live work line. */
 export function deriveChatWorkStatus(rows: ReadonlyArray<Row>): ChatWorkStatus {
@@ -88,122 +98,92 @@ function firstLine(text: string): string {
 export function applyChatStyleRows(
   rows: ReadonlyArray<Row>,
   input: {
-    /** The running turn, whose expansion state opens the live work. */
-    readonly activeTurnId: TurnId | null;
-    readonly expandedTurnIds: ReadonlySet<TurnId>;
+    /** Open work lines, by toggle id. */
+    readonly expandedBlockIds: ReadonlySet<string>;
   },
 ): Row[] {
   const result: Row[] = [];
-  for (let index = 0; index < rows.length; index += 1) {
-    const row = rows[index]!;
+  let block: Row[] = [];
+  // The last thing said (by you, or the agent's answer); the next block starts there.
+  let opener: Row | null = null;
+  // Set once the running turn begins; its last block is the live one.
+  let live: { createdAt: string | null } | null = null;
 
-    if (row.kind === "turn-fold") {
-      // Work rows just above the fold (after the last message) belong to this
-      // turn's work. Background jobs finishing stay out as events.
-      const bookkeeping: Row[] = [];
-      const events: Row[] = [];
-      while (result.length > 0 && isWorkRow(result.at(-1)!)) {
-        const previous = result.pop()!;
-        if (previous.kind === "work-toggle" && previous.isBackgroundEvent) {
-          events.unshift({ ...previous, chatEvent: true });
-        } else {
-          bookkeeping.unshift(previous);
-        }
-      }
-      result.push(...events, {
-        kind: "chat-work",
-        id: row.id,
-        createdAt: row.createdAt,
-        turnId: row.turnId,
-        expanded: row.expanded,
-        live: false,
-        label: row.label,
-        status: THINKING,
-      });
-      if (row.expanded) result.push(...bookkeeping);
-      continue;
-    }
+  const toggleIdFor = (first: Row) => `chat-work:${opener?.id ?? first.id}`;
 
+  const closeBlock = (endAt: string | null) => {
+    const first = block[0];
+    if (!first) return;
+    const toggleId = toggleIdFor(first);
+    const expanded = input.expandedBlockIds.has(toggleId);
+    const startAt = opener?.createdAt ?? first.createdAt;
+    const lastAt = endAt ?? block.at(-1)!.createdAt;
+    result.push({
+      kind: "chat-work",
+      id: toggleId,
+      createdAt: startAt,
+      toggleId,
+      expanded,
+      live: false,
+      label:
+        startAt && lastAt
+          ? `Worked for ${formatDuration(Date.parse(lastAt) - Date.parse(startAt))}`
+          : "Worked",
+      status: THINKING,
+    });
+    if (expanded) result.push(...block);
+    block = [];
+  };
+
+  const finishLive = () => {
+    if (!live) return;
+    const toggleId = `chat-work:${opener?.id ?? "live"}`;
+    const expanded = input.expandedBlockIds.has(toggleId);
+    result.push({
+      kind: "chat-work",
+      id: CHAT_LIVE_WORK_ROW_ID,
+      createdAt: opener?.createdAt ?? live.createdAt,
+      toggleId,
+      expanded,
+      live: true,
+      label: "",
+      status: deriveChatWorkStatus(block),
+    });
+    if (expanded) result.push(...block);
+    result.push({ kind: "chat-typing", id: CHAT_TYPING_ROW_ID, createdAt: live.createdAt });
+    block = [];
+    live = null;
+  };
+
+  for (const row of rows) {
+    if (row.kind === "turn-fold" || row.kind === "thinking") continue;
     if (row.kind === "working") {
-      let end = index + 1;
-      while (end < rows.length && rows[end]!.kind !== "queued-message") end += 1;
-      const segment = rows.slice(index + 1, end);
-      const expanded = input.activeTurnId !== null && input.expandedTurnIds.has(input.activeTurnId);
-      foldEarlierLiveWork(result, input.activeTurnId, expanded);
-      result.push({
-        kind: "chat-work",
-        id: CHAT_LIVE_WORK_ROW_ID,
-        createdAt: row.createdAt,
-        turnId: input.activeTurnId,
-        expanded,
-        live: true,
-        label: "",
-        status: deriveChatWorkStatus(segment),
-      });
-      for (const other of segment) {
-        if (other.kind === "thinking") continue;
-        if (expanded || other.kind === "worktree-setup" || isQuestionReplyRow(other)) {
-          result.push(other);
-        }
-      }
-      result.push({ kind: "chat-typing", id: CHAT_TYPING_ROW_ID, createdAt: row.createdAt });
-      index = end - 1;
+      live = { createdAt: row.createdAt };
       continue;
     }
-
-    if (row.kind === "work-toggle" && row.isBackgroundEvent && isBetweenTurns(rows, index)) {
-      result.push({ ...row, chatEvent: true });
+    if (isAgentWorkRow(row)) {
+      block.push(row);
       continue;
     }
-
-    result.push(row);
+    if (row.kind === "worktree-setup") {
+      result.push(row);
+      continue;
+    }
+    if (row.kind === "queued-message") {
+      finishLive();
+      result.push(row);
+      continue;
+    }
+    // Something was said or happened: the work so far closes into its own line.
+    closeBlock(row.createdAt);
+    if (isQuestionReplyRow(row)) result.push({ ...row, chatReply: true });
+    else if (isBackgroundEventRow(row)) result.push({ ...row, chatEvent: true });
+    else result.push(row);
+    opener = row;
   }
-  return result.map((row) => (isQuestionReplyRow(row) ? { ...row, chatReply: true } : row));
-}
-
-/**
- * Work from the running turn that sits above a message you sent mid-turn has no
- * work line of its own. Give each such run one ("Work so far"), sharing the live
- * line's open state, so it folds away like the rest.
- */
-function foldEarlierLiveWork(result: Row[], turnId: TurnId | null, expanded: boolean): void {
-  let end = result.length;
-  while (end > 0 && isUserMessage(result[end - 1]!)) {
-    let start = end - 1;
-    while (start > 0 && isLiveWorkRow(result[start - 1]!)) start -= 1;
-    const run = result.slice(start, end - 1);
-    if (run.length === 0) break;
-    result.splice(
-      start,
-      run.length,
-      {
-        kind: "chat-work",
-        id: `chat-work-before:${run[0]!.id}`,
-        createdAt: run[0]!.createdAt,
-        turnId,
-        expanded,
-        live: false,
-        label: "Work so far",
-        status: THINKING,
-      },
-      ...(expanded ? run : run.filter(isQuestionReplyRow)),
-    );
-    end = start;
-  }
-}
-
-const isLiveWorkRow = (row: Row) =>
-  isWorkRow(row) ||
-  isQuestionReplyRow(row) ||
-  (row.kind === "message" &&
-    row.message.role === "assistant" &&
-    !row.showAssistantMeta &&
-    row.metaMovedBelowTools !== true);
-
-/** A background event not followed by a turn of its own (the agent stayed idle). */
-function isBetweenTurns(rows: ReadonlyArray<Row>, index: number): boolean {
-  const next = rows[index + 1];
-  return next === undefined || isUserMessage(next) || next.kind === "queued-message";
+  if (live) finishLive();
+  else closeBlock(null);
+  return result;
 }
 
 export function chatWorkStatusEquals(a: ChatWorkStatus, b: ChatWorkStatus): boolean {

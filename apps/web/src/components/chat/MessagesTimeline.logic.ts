@@ -436,9 +436,10 @@ export type MessagesTimelineRow =
       kind: "chat-work";
       id: string;
       createdAt: string | null;
-      turnId: TurnId | null;
+      /** Opens and closes this line's block in the per-group expansion set. */
+      toggleId: string;
       expanded: boolean;
-      /** Running turns show live status; settled ones show `label`. */
+      /** The running block shows live status; closed ones show `label`. */
       live: boolean;
       label: string;
       status: ChatWorkStatus;
@@ -1654,7 +1655,7 @@ function isRowUnchanged(a: MessagesTimelineRow, b: MessagesTimelineRow): boolean
       const bt = b as typeof a;
       return (
         a.createdAt === bt.createdAt &&
-        a.turnId === bt.turnId &&
+        a.toggleId === bt.toggleId &&
         a.expanded === bt.expanded &&
         a.live === bt.live &&
         a.label === bt.label &&
