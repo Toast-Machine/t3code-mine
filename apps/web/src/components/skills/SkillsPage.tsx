@@ -508,8 +508,10 @@ function SkillRow(props: { entry: SkillEntry; selected: boolean; onSelect: () =>
         );
       }}
       className={cn(
-        "flex w-full cursor-pointer flex-col gap-0.5 rounded-lg px-2.5 py-2 text-left outline-none hover:bg-row-hover focus-visible:ring-2 focus-visible:ring-ring",
-        props.selected && "bg-row-active hover:bg-row-active",
+        // Personal build: the list sits on the white panel, where the sidebar's
+        // white row colors don't show; a gray wash marks hover and selection.
+        "flex w-full cursor-pointer flex-col gap-0.5 rounded-lg px-2.5 py-2 text-left outline-none hover:bg-accent/60 focus-visible:ring-2 focus-visible:ring-ring",
+        props.selected && "bg-accent hover:bg-accent",
         !entry.skill.enabled && "opacity-60",
       )}
     >
