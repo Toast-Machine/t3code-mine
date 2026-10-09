@@ -75,7 +75,7 @@ import {
 } from "../WorkspaceBreadcrumb";
 import { WorkspacePageContainer } from "../WorkspacePageContainer";
 import { WorkspacePageHeader } from "../WorkspacePageHeader";
-import { UsageLimitsSection } from "./UsageLimits";
+import { UsageLimitsDashboard } from "./UsageLimitsDashboard";
 import { UsagePriceOverrides } from "./UsagePriceOverrides";
 import { UsageProviderChart } from "./UsageProviderChart";
 import { sortModelsByTokens } from "./usageBreakdown";
@@ -93,9 +93,8 @@ import {
   type UsagePagePreferences,
 } from "./usagePagePreferences";
 
-function isUsageMetric(value: string | null | undefined): value is UsageMetric {
-  return METRIC_OPTIONS.some((option) => option.value === value);
-}
+/** Spend's units; Limits has its own views in the sidebar. */
+const SPEND_OPTIONS = METRIC_OPTIONS.filter((option) => option.value !== "limits");
 
 function isUsageWindowDays(value: number): value is UsagePagePreferences["windowDays"] {
   return WINDOW_OPTIONS.some((option) => option.days === value);
@@ -104,15 +103,15 @@ function isUsageWindowDays(value: number): value is UsagePagePreferences["window
 export interface UsagePageProps {
   /** Controlled view, e.g. from the URL. Absent uses the saved preference. */
   readonly metric?: UsageMetric;
-  readonly onMetricChange?: (metric: UsageMetric) => void;
-  /** Off when another surface (the Usage sidebar) already switches views. */
-  readonly showMetricSwitcher?: boolean;
+  /** Provider tab under Limits, by driver kind; absent is the overview. */
+  readonly provider?: string;
+  readonly onViewChange?: (metric: UsageMetric, provider?: string) => void;
 }
 
 export function UsagePage({
   metric: controlledMetric,
-  onMetricChange,
-  showMetricSwitcher = true,
+  provider: controlledProvider,
+  onViewChange,
 }: UsagePageProps = {}) {
   const [preferences, setPreferences] = useState(readUsagePagePreferences);
   useEscapeToGoBack();
@@ -135,6 +134,7 @@ export function UsagePage({
   }));
   const metric = controlledMetric ?? preferences.metric;
   const showingLimits = metric === "limits";
+  const limitsProvider = controlledMetric ? controlledProvider : preferences.provider;
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [limitsNow, setLimitsNow] = useState(() => Date.now());
   const refreshingRef = useRef(false);
@@ -209,7 +209,7 @@ export function UsagePage({
 
   const selectWindow = (days: number) => {
     if (!isUsageWindowDays(days)) return;
-    const nextPreferences = { metric, windowDays: days };
+    const nextPreferences = { ...preferences, metric, windowDays: days };
     setPreferences(nextPreferences);
     saveUsagePagePreferences(nextPreferences);
     setWindowSelection({
@@ -217,13 +217,21 @@ export function UsagePage({
       window: makeWindow(days, undefined, days === 1 ? "hour" : "day"),
     });
   };
-  const selectMetric = (nextMetric: UsageMetric) => {
+  const selectView = (nextMetric: UsageMetric, nextProvider?: string) => {
     if (nextMetric === "limits") setLimitsNow(Date.now());
-    const nextPreferences = { metric: nextMetric, windowDays };
+    const { provider: _provider, ...rest } = preferences;
+    const nextPreferences: UsagePagePreferences = {
+      ...rest,
+      metric: nextMetric,
+      windowDays,
+      ...(nextMetric === "limits" && nextProvider ? { provider: nextProvider } : {}),
+      ...(nextMetric !== "limits" ? { spendMetric: nextMetric } : {}),
+    };
     setPreferences(nextPreferences);
     saveUsagePagePreferences(nextPreferences);
-    onMetricChange?.(nextMetric);
+    onViewChange?.(nextMetric, nextMetric === "limits" ? nextProvider : undefined);
   };
+  const selectMetric = (nextMetric: UsageMetric) => selectView(nextMetric);
   const refreshLimits = async (automatic = false, afterPending = false) => {
     try {
       await Promise.all(
@@ -318,6 +326,18 @@ export function UsagePage({
     isPast24Hours && window.sinceTime !== undefined && window.untilTime !== undefined
       ? `${formatDateTimeShort(window.sinceTime, window.timeZone)} to ${formatDateTimeShort(window.untilTime, window.timeZone)}`
       : `${formatDayShort(window.sinceDay)} to ${formatDayShort(window.untilDay)}`;
+  const refreshButton = (
+    <Button
+      onClick={refreshWindow}
+      aria-label={showingLimits ? "Refresh limits" : "Refresh usage"}
+      aria-busy={isRefreshing}
+      disabled={isRefreshing}
+      size="icon-sm"
+      variant="ghost"
+    >
+      <RefreshIcon size="sm" refreshing={isRefreshing} />
+    </Button>
+  );
   const topbarContent = (
     <div className="grid w-full min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-2 py-2 xl:flex">
       <WorkspaceBreadcrumb ariaLabel="Usage breadcrumb" className="col-span-2 min-w-0">
@@ -344,116 +364,59 @@ export function UsagePage({
         </span>
       ) : null}
       <div className="ms-auto hidden min-w-0 items-center justify-end gap-2 xl:flex">
-        {showMetricSwitcher ? (
-          <ToggleGroup
-            aria-label="Usage metric"
-            variant="segmented"
-            value={[metric]}
-            onValueChange={(next) => {
-              const value = next[0];
-              if (isUsageMetric(value)) selectMetric(value);
-            }}
-          >
-            {METRIC_OPTIONS.map((option) => (
-              <Toggle key={option.value} value={option.value} title={shortcutTitle(option)}>
-                {option.label}
-              </Toggle>
-            ))}
-          </ToggleGroup>
+        {!showingLimits ? (
+          <>
+            <ToggleGroup
+              aria-label="Usage period"
+              variant="segmented"
+              value={[String(windowDays)]}
+              onValueChange={(next) => {
+                const value = next[0];
+                if (value) selectWindow(Number(value));
+              }}
+            >
+              {WINDOW_OPTIONS.map((option) => (
+                <Toggle key={option.days} value={String(option.days)} title={shortcutTitle(option)}>
+                  {option.label}
+                </Toggle>
+              ))}
+            </ToggleGroup>
+          </>
         ) : null}
-        {/* The period does not apply to Limits, so it stays in place but
-            disabled; unmounting it shifted the metric toggle ~300px. */}
-        <ToggleGroup
-          aria-label="Usage period"
-          variant="segmented"
-          value={[String(windowDays)]}
-          disabled={showingLimits}
-          onValueChange={(next) => {
-            const value = next[0];
-            if (value) selectWindow(Number(value));
-          }}
-        >
-          {WINDOW_OPTIONS.map((option) => (
-            <Toggle key={option.days} value={String(option.days)} title={shortcutTitle(option)}>
-              {option.label}
-            </Toggle>
-          ))}
-        </ToggleGroup>
-        <Button
-          onClick={refreshWindow}
-          aria-label={showingLimits ? "Refresh limits" : "Refresh usage"}
-          aria-busy={isRefreshing}
-          disabled={isRefreshing}
-          size="icon-sm"
-          variant="ghost"
-        >
-          <RefreshIcon size="sm" refreshing={isRefreshing} />
-        </Button>
+        {refreshButton}
       </div>
       <div className="col-span-2 ms-auto flex min-w-0 items-center justify-end gap-1 xl:hidden">
-        {showMetricSwitcher ? (
-          <Select
-            value={metric}
-            onValueChange={(value) => {
-              if (isUsageMetric(value)) selectMetric(value);
-            }}
-          >
-            <SelectTrigger
-              aria-label="Usage metric"
-              size="compact"
-              variant="ghost"
-              className="w-auto min-w-0"
+        {!showingLimits ? (
+          <>
+            <Select
+              value={String(windowDays)}
+              onValueChange={(value) => selectWindow(Number(value))}
             >
-              <SelectValue>
-                {METRIC_OPTIONS.find((option) => option.value === metric)?.label}
-              </SelectValue>
-            </SelectTrigger>
-            <SelectPopup align="end" alignItemWithTrigger={false}>
-              {METRIC_OPTIONS.map((option) => (
-                <SelectItem key={option.value} value={option.value} title={shortcutTitle(option)}>
-                  {option.label}
-                </SelectItem>
-              ))}
-            </SelectPopup>
-          </Select>
-        ) : null}
-        <Select
-          value={String(windowDays)}
-          disabled={showingLimits}
-          onValueChange={(value) => selectWindow(Number(value))}
-        >
-          <SelectTrigger
-            aria-label="Usage period"
-            size="compact"
-            variant="ghost"
-            className="w-auto min-w-0"
-          >
-            <SelectValue>
-              {WINDOW_OPTIONS.find((option) => option.days === windowDays)?.label}
-            </SelectValue>
-          </SelectTrigger>
-          <SelectPopup align="end" alignItemWithTrigger={false}>
-            {WINDOW_OPTIONS.map((option) => (
-              <SelectItem
-                key={option.days}
-                value={String(option.days)}
-                title={shortcutTitle(option)}
+              <SelectTrigger
+                aria-label="Usage period"
+                size="compact"
+                variant="ghost"
+                className="w-auto min-w-0"
               >
-                {option.label}
-              </SelectItem>
-            ))}
-          </SelectPopup>
-        </Select>
-        <Button
-          onClick={refreshWindow}
-          aria-label={showingLimits ? "Refresh limits" : "Refresh usage"}
-          aria-busy={isRefreshing}
-          disabled={isRefreshing}
-          size="icon-sm"
-          variant="ghost"
-        >
-          <RefreshIcon size="sm" refreshing={isRefreshing} />
-        </Button>
+                <SelectValue>
+                  {WINDOW_OPTIONS.find((option) => option.days === windowDays)?.label}
+                </SelectValue>
+              </SelectTrigger>
+              <SelectPopup align="end" alignItemWithTrigger={false}>
+                {WINDOW_OPTIONS.map((option) => (
+                  <SelectItem
+                    key={option.days}
+                    value={String(option.days)}
+                    title={shortcutTitle(option)}
+                  >
+                    {option.label}
+                  </SelectItem>
+                ))}
+              </SelectPopup>
+            </Select>
+          </>
+        ) : null}
+        {refreshButton}
       </div>
     </div>
   );
@@ -479,7 +442,9 @@ export function UsagePage({
                   : `Select an environment to see ${showingLimits ? "limits" : "usage"}.`}
               </p>
             ) : showingLimits ? (
-              <UsageLimitsSection
+              <UsageLimitsDashboard
+                provider={limitsProvider ?? null}
+                onSelectProvider={(driver) => selectView("limits", driver)}
                 selectedEnvironmentIds={selectedEnvironmentIds}
                 now={limitsNow}
                 cursorPrompt={
@@ -507,34 +472,30 @@ export function UsagePage({
                   <div className="flex min-w-0 flex-col gap-5">
                     <div className="flex flex-col gap-1">
                       <span className="text-4xl font-semibold text-foreground tabular-nums">
-                        {metric === "cost"
-                          ? formatUsd(merged.costUsd)
-                          : formatTokens(merged.totalTokens)}
+                        {formatUsd(merged.costUsd)}
+                      </span>
+                      <span className="text-sm font-medium text-foreground tabular-nums">
+                        {formatTokens(merged.totalTokens)} tokens
                       </span>
                       <span className="text-xs text-muted-foreground">
                         {formatCount(merged.sessions)} sessions
-                        {metric === "cost" && (
+                        {" · API estimate"}
+                        {merged.costQuality.unpricedShare > 0 && (
                           <>
-                            {" · API estimate"}
-                            {merged.costQuality.unpricedShare > 0 && (
-                              <>
-                                {" "}
-                                <Popover>
-                                  <PopoverTrigger
-                                    openOnHover
-                                    render={<InlineButton tone="muted" />}
-                                    aria-label="Unpriced usage details"
-                                  >
-                                    <InfoIcon className="size-3" aria-hidden />
-                                  </PopoverTrigger>
-                                  <PopoverPopup side="top" tooltipStyle>
-                                    API estimate excludes{" "}
-                                    {formatPercent(merged.costQuality.unpricedShare)} unpriced
-                                    records.
-                                  </PopoverPopup>
-                                </Popover>
-                              </>
-                            )}
+                            {" "}
+                            <Popover>
+                              <PopoverTrigger
+                                openOnHover
+                                render={<InlineButton tone="muted" />}
+                                aria-label="Unpriced usage details"
+                              >
+                                <InfoIcon className="size-3" aria-hidden />
+                              </PopoverTrigger>
+                              <PopoverPopup side="top" tooltipStyle>
+                                API estimate excludes{" "}
+                                {formatPercent(merged.costQuality.unpricedShare)} unpriced records.
+                              </PopoverPopup>
+                            </Popover>
                           </>
                         )}
                       </span>
@@ -568,8 +529,7 @@ export function UsagePage({
                       }
                       const provider = row.provider;
                       const totals = merged.providers.find((entry) => entry.provider === provider);
-                      const share =
-                        metric === "cost" ? (totals?.costShare ?? 0) : (totals?.tokenShare ?? 0);
+                      const share = totals?.costShare ?? 0;
                       const providerSessions = totals?.sessions ?? 0;
                       const sessionLabel = `${formatCount(providerSessions)} ${
                         providerSessions === 1 ? "session" : "sessions"
@@ -596,15 +556,11 @@ export function UsagePage({
                               </span>
                             </span>
                             <span className="shrink-0 text-sm font-medium text-foreground tabular-nums">
-                              {metric === "cost"
-                                ? formatUsd(totals?.costUsd ?? 0)
-                                : formatTokens(totals?.totalTokens ?? 0)}
+                              {formatUsd(totals?.costUsd ?? 0)}
                             </span>
                           </div>
                           <span className="text-xs text-muted-foreground">
-                            {metric === "cost"
-                              ? `${formatPercent(share)} of cost · ${formatTokens(totals?.totalTokens ?? 0)} tokens`
-                              : `${formatPercent(share)} of tokens · ${formatUsd(totals?.costUsd ?? 0)}`}
+                            {`${formatPercent(share)} of cost · ${formatTokens(totals?.totalTokens ?? 0)} tokens`}
                           </span>
                         </div>
                       );
@@ -612,10 +568,31 @@ export function UsagePage({
                   </div>
 
                   <div className="flex min-w-0 flex-col gap-3">
-                    <h2 className="text-sm font-medium text-foreground">
-                      {isPast24Hours ? "Hourly" : "Daily"}{" "}
-                      {metric === "tokens" ? "processed tokens" : "cost"}
-                    </h2>
+                    <div className="flex items-center justify-between gap-3">
+                      <h2 className="text-sm font-medium text-foreground">
+                        {isPast24Hours ? "Hourly" : "Daily"}{" "}
+                        {metric === "tokens" ? "processed tokens" : "cost"}
+                      </h2>
+                      <ToggleGroup
+                        aria-label="Chart unit"
+                        variant="segmented"
+                        value={[metric]}
+                        onValueChange={(next) => {
+                          const value = next[0];
+                          if (value === "cost" || value === "tokens") selectMetric(value);
+                        }}
+                      >
+                        {SPEND_OPTIONS.map((option) => (
+                          <Toggle
+                            key={option.value}
+                            value={option.value}
+                            title={shortcutTitle(option)}
+                          >
+                            {option.label}
+                          </Toggle>
+                        ))}
+                      </ToggleGroup>
+                    </div>
                     <UsageProviderChart
                       providers={activeProviders}
                       days={days}

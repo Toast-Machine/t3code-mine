@@ -1,33 +1,38 @@
-import { ChartNoAxesColumnIcon, CoinsIcon, GaugeIcon } from "lucide-react";
+import { CoinsIcon, GaugeIcon } from "lucide-react";
 import { useNavigate, useSearch } from "@tanstack/react-router";
 
 import { PageSidebarNav } from "../sidebar/PageSidebarNav";
 import { readUsagePagePreferences } from "./usagePagePreferences";
-import { METRIC_OPTIONS, type UsageMetric } from "./usageShortcuts";
 
-const METRIC_ICONS = {
-  cost: CoinsIcon,
-  tokens: ChartNoAxesColumnIcon,
-  limits: GaugeIcon,
-} as const satisfies Record<UsageMetric, unknown>;
-
-// The Usage page's views; the selected one lives in the URL (?metric=).
+// The Usage page's two views: Limits (what is left) and Spend (API-equivalent
+// cost and tokens). The selection lives in the URL (?metric=).
 export function UsageSidebarNav() {
   const navigate = useNavigate();
   // Not required to match: the sidebar can render a frame apart from the page.
-  const metric =
-    useSearch({ from: "/usage", shouldThrow: false })?.metric ?? readUsagePagePreferences().metric;
+  const saved = readUsagePagePreferences();
+  const metric = useSearch({ from: "/usage", shouldThrow: false })?.metric ?? saved.metric;
+  const onLimits = metric === "limits";
   return (
     <PageSidebarNav
       sections={[
         {
-          items: METRIC_OPTIONS.map((option) => ({
-            id: option.value,
-            label: option.label,
-            icon: METRIC_ICONS[option.value],
-            active: metric === option.value,
-            onSelect: () => void navigate({ to: "/usage", search: { metric: option.value } }),
-          })),
+          items: [
+            {
+              id: "limits",
+              label: "Limits",
+              icon: GaugeIcon,
+              active: onLimits,
+              onSelect: () => void navigate({ to: "/usage", search: { metric: "limits" } }),
+            },
+            {
+              id: "spend",
+              label: "Spend",
+              icon: CoinsIcon,
+              active: !onLimits,
+              onSelect: () =>
+                void navigate({ to: "/usage", search: { metric: saved.spendMetric ?? "cost" } }),
+            },
+          ],
         },
       ]}
     />

@@ -22,6 +22,7 @@ import {
   USAGE_CONTRACT_VERSION,
   type ServerSettings as ServerSettingsValue,
   type UsageProviderKind,
+  type UsageBreakdownInput,
   type UsageSource,
   type UsagePricing,
   type UsageSummary,
@@ -54,10 +55,17 @@ import { readOpenCodeUsage } from "./opencodeUsageReader.ts";
 import { readAntigravityUsage } from "./antigravityUsageReader.ts";
 import { readCursorAccountUsage } from "./cursorUsageReader.ts";
 import { UsageAggregator } from "./usageAggregation.ts";
+import {
+  parseCodexSessionIndex,
+  parseSessionHead,
+  type ScannedSession,
+  UsageSessionAggregator,
+} from "./usageSessions.ts";
 import { createOverrideRateTable, parseRateTable, type RateTable } from "./usagePricing.ts";
 import {
   listTranscriptFiles,
   readDirectoryVolumeId,
+  readFileHead,
   readTranscriptRecords,
 } from "./usageTranscriptReader.ts";
 import {
@@ -84,6 +92,8 @@ const RATES_REFRESH_FLOOR_MS = 60 * 1000;
  */
 const MTIME_SLACK_MS = 36 * 60 * 60 * 1000;
 const MAX_HOURLY_WINDOW_MS = 24 * 60 * 60 * 1000;
+/** A monthly quota window plus slack. */
+const MAX_SESSION_WINDOW_MS = 32 * 24 * 60 * 60 * 1000;
 
 /** Longest window the UI offers, plus slack. Older entries are pruned. */
 const CACHE_RETENTION_DAYS = 90;
@@ -113,12 +123,28 @@ const decodeCachedSources = Schema.decodeUnknownOption(
   Schema.Struct({ sources: Schema.Record(Schema.String, CachedSource) }),
 );
 
+/** One provider session in a window, with what its transcript says about where it ran. */
+export interface UsageSessionScanEntry extends ScannedSession {
+  readonly cwd?: string;
+  readonly title?: string;
+  readonly origin?: string;
+}
+
+export interface UsageSessionScan {
+  readonly readAt: string;
+  readonly sessions: readonly UsageSessionScanEntry[];
+}
+
 export class UsageService extends Context.Service<
   UsageService,
   {
     readonly readSummary: (input: UsageSummaryInput) => Effect.Effect<UsageSummary, UsageReadError>;
     /** Refetches the rate table ahead of its TTL. See `ensureRates`. */
     readonly refreshRates: Effect.Effect<UsagePricing>;
+    /** Per-session usage for one provider and window, most expensive first. */
+    readonly readSessions: (
+      input: UsageBreakdownInput,
+    ) => Effect.Effect<UsageSessionScan, UsageReadError>;
   }
 >()("t3/usage/UsageService") {}
 
@@ -146,6 +172,7 @@ export const layerTest = Layer.succeed(
         scanDurationMs: 0,
       }),
     refreshRates: Effect.succeed(EMPTY_PRICING),
+    readSessions: () => Effect.succeed({ readAt: "1970-01-01T00:00:00.000Z", sessions: [] }),
   }),
 );
 
@@ -473,10 +500,15 @@ export const make = Effect.gen(function* () {
       | null;
   }
 
+  /**
+   * `only` limits the walk to one transcript-file provider (Claude, Codex,
+   * Grok), skipping every other provider's disk and network reads.
+   */
   const collectDirs = Effect.fn("UsageService.collectDirs")(function* (
     windowStartMs: number,
     settings: ServerSettingsValue,
     retentionCutoffMs: number,
+    only?: UsageProviderKind,
   ) {
     // The home resolvers ask for `Path` themselves; satisfy them from the
     // instance we already hold so the scan stays context-free.
@@ -485,6 +517,7 @@ export const make = Effect.gen(function* () {
     );
     const scanned: ScannedDir[] = [];
     for (const { provider, dir, volumeId, fileName } of dirs) {
+      if (only !== undefined && only !== provider) continue;
       const exists = yield* fileSystem
         .exists(dir)
         .pipe(Effect.catchCause(() => Effect.succeed(false)));
@@ -502,6 +535,7 @@ export const make = Effect.gen(function* () {
       }
       scanned.push({ provider, dir, volumeId, files: parsedFiles });
     }
+    if (only !== undefined) return scanned;
 
     const home = NodeOS.homedir();
     const envRoots = Effect.fnUntraced(function* (key: string, defaults: readonly string[]) {
@@ -672,6 +706,57 @@ export const make = Effect.gen(function* () {
     return scanned;
   });
 
+  /**
+   * A directory's parsed files plus the saved records of transcripts cleanup
+   * has since removed: that usage still happened, so it keeps counting until
+   * the cache retention expires.
+   */
+  const retainedFilesOf = (
+    provider: UsageProviderKind,
+    dir: string,
+    files: ScannedDir["files"],
+    retentionCutoffMs: number,
+  ) => {
+    const retainedFiles = [...(files ?? [])];
+    const livePaths = new Set(retainedFiles.map((file) => file.path));
+    for (const [filePath, entry] of fileCache) {
+      if (
+        entry.provider !== provider ||
+        entry.mtimeMs < retentionCutoffMs ||
+        livePaths.has(filePath) ||
+        !isWithinDirectory(filePath, dir)
+      )
+        continue;
+      retainedFiles.push({ path: filePath, records: [...entry.records, ...entry.tailRecords] });
+    }
+    return retainedFiles;
+  };
+
+  /**
+   * One file's records, with Codex events keyed so moved rollout copies
+   * de-duplicate without collapsing repeated equal events within one rollout
+   * (timestamps can have only second precision).
+   */
+  function* keyedRecords(records: readonly UsageRecord[]): Generator<UsageRecord> {
+    const codexEventOccurrences = new Map<string, number>();
+    for (const record of records) {
+      if (record.provider !== "codex" || record.sessionId.length === 0) {
+        yield record;
+        continue;
+      }
+      const key = encodeUsageRecordKey([
+        record.provider,
+        record.sessionId,
+        record.timestampMs,
+        record.model,
+        record.totals,
+      ]);
+      const occurrence = (codexEventOccurrences.get(key) ?? 0) + 1;
+      codexEventOccurrences.set(key, occurrence);
+      yield { ...record, dedupeKey: key + ":" + occurrence };
+    }
+  }
+
   const scanSummary = Effect.fn("UsageService.scanSummary")(function* (
     input: UsageSummaryInput,
     settings: ServerSettingsValue,
@@ -753,20 +838,7 @@ export const make = Effect.gen(function* () {
       action,
       hostId: sourceHostId,
     } of scannedDirs) {
-      const retainedFiles = [...(files ?? [])];
-      const livePaths = new Set(retainedFiles.map((file) => file.path));
-      // Cleanup may remove transcripts, but the usage we already saved still
-      // contributes to this source. Keep the normal aggregation and dedupe path.
-      for (const [filePath, entry] of fileCache) {
-        if (
-          entry.provider !== provider ||
-          entry.mtimeMs < retentionCutoffMs ||
-          livePaths.has(filePath) ||
-          !isWithinDirectory(filePath, dir)
-        )
-          continue;
-        retainedFiles.push({ path: filePath, records: [...entry.records, ...entry.tailRecords] });
-      }
+      const retainedFiles = retainedFilesOf(provider, dir, files, retentionCutoffMs);
       let scannedFiles = 0;
       let skippedFiles = 0;
       // Distinct per directory. Buckets carry per-cell session counts, but a
@@ -779,26 +851,10 @@ export const make = Effect.gen(function* () {
           continue;
         }
         scannedFiles += 1;
-        const codexEventOccurrences = new Map<string, number>();
-        for (const record of file.records) {
-          let usageRecord = record;
-          if (record.provider === "codex" && record.sessionId.length > 0) {
-            // Match moved rollout copies without collapsing repeated equal events
-            // within one rollout (timestamps can have only second precision).
-            const key = encodeUsageRecordKey([
-              record.provider,
-              record.sessionId,
-              record.timestampMs,
-              record.model,
-              record.totals,
-            ]);
-            const occurrence = (codexEventOccurrences.get(key) ?? 0) + 1;
-            codexEventOccurrences.set(key, occurrence);
-            usageRecord = { ...record, dedupeKey: key + ":" + occurrence };
-          }
+        for (const record of keyedRecords(file.records)) {
           // Only sessions contributing in-window count; the mtime slack can
           // admit boundary files whose records fall outside the range.
-          if (aggregator.add(usageRecord, dir) && record.sessionId.length > 0) {
+          if (aggregator.add(record, dir) && record.sessionId.length > 0) {
             sessionIds.add(record.sessionId);
           }
         }
@@ -892,7 +948,87 @@ export const make = Effect.gen(function* () {
     return yield* Deferred.await(deferred);
   });
 
-  return { readSummary, refreshRates } as const;
+  /** Transcript heads by `path:size`; a grown Claude file may have gained its title. */
+  const headCache = new Map<string, { cwd?: string; title?: string; origin?: string }>();
+
+  const readSessions = Effect.fn("UsageService.readSessions")(function* (
+    input: UsageBreakdownInput,
+  ) {
+    const since = DateTime.make(input.sinceTime);
+    const until = DateTime.make(input.untilTime);
+    if (Option.isNone(since) || Option.isNone(until)) {
+      return yield* new UsageReadError({
+        reason: "invalidWindow",
+        detail: "Session usage requires valid sinceTime and untilTime instants",
+      });
+    }
+    const sinceTimeMs = DateTime.toEpochMillis(since.value);
+    const untilTimeMs = DateTime.toEpochMillis(until.value);
+    if (untilTimeMs <= sinceTimeMs || untilTimeMs - sinceTimeMs > MAX_SESSION_WINDOW_MS) {
+      return yield* new UsageReadError({
+        reason: "invalidWindow",
+        detail: "Session usage window must be greater than zero and at most 32 days",
+      });
+    }
+    if (input.provider !== "claude" && input.provider !== "codex" && input.provider !== "grok") {
+      return { readAt: DateTime.formatIso(yield* DateTime.now), sessions: [] };
+    }
+
+    const settings = yield* readSettings;
+    yield* ensureScanCacheLoaded;
+    const startedAtMs = yield* Clock.currentTimeMillis;
+    const retentionCutoffMs = startedAtMs - CACHE_RETENTION_DAYS * 24 * 60 * 60 * 1000;
+    const [, scannedDirs] = yield* Effect.all(
+      [
+        ensureRates(false),
+        collectDirs(sinceTimeMs - MTIME_SLACK_MS, settings, retentionCutoffMs, input.provider),
+      ],
+      { concurrency: 2 },
+    );
+
+    const aggregator = new UsageSessionAggregator({
+      provider: input.provider,
+      sinceTimeMs,
+      untilTimeMs,
+      rates,
+      priceOverrides: createOverrideRateTable(settings.usagePriceOverrides),
+    });
+    const codexNames = new Map<string, string>();
+    for (const { provider, dir, files } of scannedDirs) {
+      if (provider !== input.provider) continue;
+      for (const file of retainedFilesOf(provider, dir, files, retentionCutoffMs)) {
+        for (const record of keyedRecords(file.records)) aggregator.add(record, file.path);
+      }
+      if (provider === "codex") {
+        const index = yield* fileSystem
+          .readFileString(path.join(dir, "..", "session_index.jsonl"))
+          .pipe(Effect.orElseSucceed(() => ""));
+        for (const [id, name] of parseCodexSessionIndex(index)) codexNames.set(id, name);
+      }
+    }
+    yield* persistScanCache();
+
+    const sessions: UsageSessionScanEntry[] = [];
+    for (const session of aggregator.finish()) {
+      const key = `${session.filePath}:${fileCache.get(session.filePath)?.size ?? ""}`;
+      let head = headCache.get(key);
+      if (head === undefined) {
+        const text = yield* Effect.promise(() => readFileHead(session.filePath));
+        head = text === null ? {} : parseSessionHead(text);
+        headCache.set(key, head);
+      }
+      const title = codexNames.get(session.sessionId) ?? head.title;
+      sessions.push({
+        ...session,
+        ...(head.cwd ? { cwd: head.cwd } : {}),
+        ...(head.origin ? { origin: head.origin } : {}),
+        ...(title ? { title } : {}),
+      });
+    }
+    return { readAt: DateTime.formatIso(yield* DateTime.now), sessions };
+  });
+
+  return { readSummary, refreshRates, readSessions } as const;
 });
 
 export const layer = Layer.effect(UsageService, make);

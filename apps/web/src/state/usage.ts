@@ -10,6 +10,8 @@ import { useAtomValue } from "@effect/atom-react";
 import {
   USAGE_CONTRACT_VERSION,
   type EnvironmentId,
+  type UsageBreakdownInput,
+  type UsageBreakdownSession,
   type UsageSummary,
   type UsageSummaryInput,
 } from "@t3tools/contracts";
@@ -157,3 +159,46 @@ export function useUsage(
     refresh,
   };
 }
+
+const usageBreakdownAtom = Atom.family((key: string) =>
+  Atom.make((get) => {
+    const { input, environmentIds } = JSON.parse(key) as {
+      input: UsageBreakdownInput;
+      environmentIds: EnvironmentId[] | null;
+    };
+    const presentations = get(environmentPresentations.presentationsAtom);
+    const answers: { environmentId: EnvironmentId; sessions: readonly UsageBreakdownSession[] }[] =
+      [];
+    let waiting = 0;
+    for (const [environmentId, presentation] of presentations) {
+      if (environmentIds !== null && !environmentIds.includes(environmentId)) continue;
+      if (presentation.connection.phase !== "connected") continue;
+      const result = get(serverEnvironment.usageBreakdown({ environmentId, input }));
+      const value = Option.getOrNull(AsyncResult.value(result));
+      if (value) answers.push({ environmentId, sessions: value.sessions });
+      else if (result.waiting) waiting += 1;
+    }
+    return { answers, isPending: answers.length === 0 && waiting > 0 };
+  }).pipe(Atom.withLabel(`web-usage:breakdown:${key}`)),
+);
+
+/**
+ * Per-session usage for one provider window from every selected environment.
+ * Pass `null` to skip the read (no window to explain).
+ */
+export function useUsageBreakdown(
+  input: UsageBreakdownInput | null,
+  selectedEnvironmentIds: ReadonlySet<EnvironmentId> | null,
+) {
+  const key = JSON.stringify({
+    input,
+    environmentIds: selectedEnvironmentIds === null ? null : [...selectedEnvironmentIds].sort(),
+  });
+  const result = useAtomValue(input === null ? emptyBreakdownAtom : usageBreakdownAtom(key));
+  return result;
+}
+
+const emptyBreakdownAtom = Atom.make(() => ({
+  answers: [] as { environmentId: EnvironmentId; sessions: readonly UsageBreakdownSession[] }[],
+  isPending: false,
+})).pipe(Atom.withLabel("web-usage:breakdown:none"));

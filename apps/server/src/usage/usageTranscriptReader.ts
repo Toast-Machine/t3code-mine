@@ -416,3 +416,27 @@ export async function readTranscriptRecords(
     await handle.close().catch(() => undefined);
   }
 }
+
+/**
+ * The first `bytes` of a file as text, or `null` when it cannot be read. Only
+ * complete lines are returned so a JSON value is never cut in half.
+ */
+export async function readFileHead(filePath: string, bytes = 128 * 1024): Promise<string | null> {
+  let handle: NodeFSP.FileHandle;
+  try {
+    handle = await NodeFSP.open(filePath, "r");
+  } catch {
+    return null;
+  }
+  try {
+    const buffer = Buffer.alloc(bytes);
+    const { bytesRead } = await handle.read(buffer, 0, bytes, 0);
+    const chunk = buffer.subarray(0, bytesRead);
+    const lastNewline = bytesRead === bytes ? chunk.lastIndexOf(NEWLINE) : bytesRead;
+    return chunk.subarray(0, lastNewline < 0 ? bytesRead : lastNewline).toString("utf8");
+  } catch {
+    return null;
+  } finally {
+    await handle.close().catch(() => undefined);
+  }
+}
