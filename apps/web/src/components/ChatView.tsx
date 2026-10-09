@@ -370,6 +370,7 @@ import { createPageScrollController, type PageScrollKey } from "./chat/pageScrol
 import { isTimelineScrollTarget } from "./chat/timelineScrollTarget";
 import { DraftHeroHeadline } from "./chat/DraftHeroHeadline";
 import { ExpandedImageDialog } from "./chat/ExpandedImageDialog";
+import { collectChatMedia, withChatMedia } from "./chat/chatMediaGallery";
 import { PullRequestThreadDialog } from "./PullRequestThreadDialog";
 import { MessagesTimeline } from "./chat/MessagesTimeline";
 import type { AssistantCitationRequest } from "./chat/AssistantCitationSource";
@@ -9412,7 +9413,27 @@ export default function ChatView(props: ChatViewProps) {
     }
   };
 
+  // Personal build: media opened from the timeline browses every image and
+  // video in the chat. The list is built on click, so streaming costs nothing.
+  const chatMediaInputRef = useRef({
+    messages: timelineMessages,
+    environmentId: activeThreadEnvironmentId,
+    threadRef: activeThreadRef,
+    cwd: gitCwd ?? undefined,
+  });
+  useLayoutEffect(() => {
+    chatMediaInputRef.current = {
+      messages: timelineMessages,
+      environmentId: activeThreadEnvironmentId,
+      threadRef: activeThreadRef,
+      cwd: gitCwd ?? undefined,
+    };
+  });
   const onExpandTimelineImage = useCallback((preview: ExpandedImagePreview) => {
+    const { messages, ...input } = chatMediaInputRef.current;
+    setExpandedImage(withChatMedia(preview, collectChatMedia(messages, input)));
+  }, []);
+  const onExpandComposerImage = useCallback((preview: ExpandedImagePreview) => {
     setExpandedImage(preview);
   }, []);
   const onOpenTurnDiff = useCallback(
@@ -10119,7 +10140,7 @@ export default function ChatView(props: ChatViewProps) {
                             focusComposer={focusComposer}
                             scheduleComposerFocus={scheduleComposerFocus}
                             setThreadError={setThreadError}
-                            onExpandImage={onExpandTimelineImage}
+                            onExpandImage={onExpandComposerImage}
                             onFileOpen={openFileAttachment}
                           />
                         </div>
