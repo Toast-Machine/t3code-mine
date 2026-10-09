@@ -22,6 +22,7 @@ import {
   unlockNotificationAudio,
 } from "../threadNotifications";
 import { useBackgroundGraceVersion, withBackgroundGrace } from "../backgroundGrace";
+import { sidebarMessagePreview } from "./messagePreview";
 import { useNeedsYouCount } from "./needsYouCount";
 import { resolveSidebarThreadStatus } from "./Sidebar.logic";
 import { toastManager } from "./ui/toast";
@@ -203,8 +204,13 @@ function EnvironmentNotifications({
       )
         continue;
       try {
-        const notification = new Notification(title, {
-          body: thread.title,
+        // Lead with the chat, like the sidebar card: its title, then what the
+        // agent said. Attention states keep their label as the body, since
+        // the latest finished reply predates the question or failure.
+        const notification = new Notification(thread.title, {
+          body:
+            (kind === "completion" ? sidebarMessagePreview(thread.latestAssistantPreview) : null) ??
+            title,
           tag: `${environmentId}:${thread.id}`,
           silent: true,
         });
