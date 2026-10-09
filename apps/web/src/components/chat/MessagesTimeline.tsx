@@ -1737,9 +1737,11 @@ const TimelineRowContent = memo(function TimelineRowContent({ row }: { row: Time
           row.kind === "assistant-meta"
           ? "group/assistant"
           : null,
-        // Personal build: the turn's work hangs off one continuous rail. It is
-        // drawn on the whole row, padding included, so stacked rows join up.
-        chatRowOnRail(row) && "ms-2 border-s-2 border-border ps-3",
+        // Personal build: the turn's work hangs off one continuous rail, drawn on
+        // the whole row (padding included). Rows sit on fractional pixels, so the
+        // bar reaches a pixel past each edge to overlap its neighbours.
+        chatRowOnRail(row) &&
+          "relative ms-2 ps-3.5 before:absolute before:-top-px before:-bottom-px before:start-0 before:w-0.5 before:bg-border",
       )}
       data-timeline-row-id={row.id}
       data-timeline-row-kind={row.kind}
