@@ -1663,9 +1663,14 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: {
     !hasUnsentDraft && lineStatus?.icon === "failed"
       ? sidebarMessagePreview(thread.session?.lastError)
       : null;
+  // While the agent works, its last reply is stale (like a messages app showing
+  // "typing…" instead of the old message): the line reads "Working", with the
+  // current plan step when there is one.
+  const workingDetails = status === "working" ? (thread.planProgress?.step ?? "") : null;
   const rowDetails =
     (hasUnsentDraft ? draftPreview : null) ??
     failurePreview ??
+    workingDetails ??
     sidebarMessagePreview(thread.latestAssistantPreview) ??
     [props.projectDisplayName, thread.branch]
       .filter((part): part is string => Boolean(part))
