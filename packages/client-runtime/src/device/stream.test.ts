@@ -4,6 +4,7 @@ import {
   createDeviceStreamClient,
   AvccDemuxer,
   avcCodecString,
+  hidStrokesForText,
   parseSemuPacket,
   scanAccessUnit,
 } from "./stream.ts";
@@ -735,4 +736,23 @@ it("reports a stalled AVCC body after its initial image instead of leaving a fro
     vi.useRealTimers();
     vi.unstubAllGlobals();
   }
+});
+
+describe("hidStrokesForText", () => {
+  it("types a pasted email with shifted symbols", () => {
+    expect(hidStrokesForText("Ab@1.")).toEqual([
+      { usage: 0x04, shift: true },
+      { usage: 0x05, shift: false },
+      { usage: 0x1f, shift: true },
+      { usage: 0x1e, shift: false },
+      { usage: 0x37, shift: false },
+    ]);
+  });
+
+  it("maps line breaks to Return and skips characters without a US key", () => {
+    expect(hidStrokesForText("a\r\n😀é")).toEqual([
+      { usage: 0x04, shift: false },
+      { usage: 0x28, shift: false },
+    ]);
+  });
 });
