@@ -180,6 +180,39 @@ describe("applyChatStyleRows", () => {
     expect(rows[4]).toMatchObject({ id: CHAT_TYPING_ROW_ID });
   });
 
+  it("opens a background event's details right under it", () => {
+    const jobDone: TimelineEntry = {
+      id: "job-done",
+      kind: "work",
+      createdAt: time(6),
+      entry: {
+        id: "job-done",
+        turnId,
+        createdAt: time(6),
+        label: "Backfill finished",
+        tone: "info",
+        sourceActivityKind: "task.completed",
+        taskId: "job",
+        isBackgroundTask: true,
+        detail: "Scanned 304 portals.",
+      },
+    };
+    const rows = deriveMessagesTimelineRows({
+      timelineEntries: [...settledTurn, jobDone],
+      latestTurn: { turnId, state: "completed", startedAt: time(0), completedAt: time(9) },
+      expandedTurnIds: everyTurn,
+      expandedWorkGroupIds: new Set(["work-group:job-done"]),
+      isWorking: false,
+      activeTurnStartedAt: null,
+      turnDiffSummaries: [],
+      supportsConversationRollback: false,
+    });
+    const chat = applyChatStyleRows(rows, { expandedBlockIds: new Set() });
+    const event = chat.findIndex((row) => "chatEvent" in row && row.chatEvent);
+    expect(event).toBeGreaterThan(-1);
+    expect(chat[event + 1]).toMatchObject({ id: "work-group:job-done:details" });
+  });
+
   it("keeps a live line's open state when the turn settles", () => {
     const open = new Set(["chat-work:user"]);
     const running = runningRows(

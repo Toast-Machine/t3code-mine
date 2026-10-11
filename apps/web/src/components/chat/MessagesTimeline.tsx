@@ -5042,25 +5042,26 @@ const PlainWorkEntryRow = memo(function PlainWorkEntryRow(props: {
           workspaceRoot,
         })
       : null;
+  // Personal build: a row only opens when opening shows something. Detail that
+  // repeats the row's own label (a background job's one-line summary) used to
+  // open an empty panel. MCP payloads are stringified only once opened.
+  const hasMcpData = workEntry.itemType === "mcp_tool_call" && workEntry.toolData !== undefined;
+  const buildBody = () =>
+    buildToolCallExpandedBody(
+      workEntry,
+      workspaceRoot,
+      previewText,
+      viewedImage ? viewedImagePath : null,
+    );
+  const textBody = hasMcpData ? null : buildBody();
   const canExpand =
     Boolean(workEntry.questionAnswer) ||
+    // Opening a failure unwraps its full message.
     (showFailedIndicator && previewText.trim().length > 0) ||
-    (workEntry.itemType === "mcp_tool_call" && workEntry.toolData !== undefined) ||
-    Boolean(
-      workEntryRawCommand(workEntry) ||
-      workEntry.command?.trim() ||
-      workEntry.detail?.trim() ||
-      workEntry.changedFiles?.length ||
-      viewedImage,
-    );
-  const expandedBody = expanded
-    ? buildToolCallExpandedBody(
-        workEntry,
-        workspaceRoot,
-        previewText,
-        viewedImage ? viewedImagePath : null,
-      )
-    : null;
+    Boolean(viewedImage) ||
+    hasMcpData ||
+    textBody !== null;
+  const expandedBody = expanded ? (hasMcpData ? buildBody() : textBody) : null;
   // Reserve destructive row styling for severe failures, not routine tool errors.
   const iconWrapperClass = cn(
     "flex size-6 shrink-0 items-center justify-center",

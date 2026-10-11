@@ -160,8 +160,16 @@ export function applyChatStyleRows(
     (row) => row.kind === "message" && row.message.role === "user",
   );
 
+  // An opened background event's details, shown right under it.
+  let openEventDetailsId: string | null = null;
+
   for (const [index, row] of rows.entries()) {
     if (row.kind === "turn-fold" || row.kind === "thinking") continue;
+    if (row.id === openEventDetailsId) {
+      result.push(row);
+      openEventDetailsId = null;
+      continue;
+    }
     if (row.kind === "assistant-meta" && pendingAnswer) {
       // The copy button and time sit right under the answer.
       pendingAnswer = {
@@ -224,8 +232,10 @@ export function applyChatStyleRows(
     if (pendingAnswer) flushAnswer();
     else closeBlock(row.createdAt);
     if (isQuestionReplyRow(row)) result.push({ ...row, chatReply: true });
-    else if (isBackgroundEventRow(row)) result.push({ ...row, chatEvent: true });
-    else result.push(row);
+    else if (isBackgroundEventRow(row)) {
+      result.push({ ...row, chatEvent: true });
+      if (row.expanded) openEventDetailsId = `${row.groupId}:details`;
+    } else result.push(row);
     opener = row;
   }
   flushAnswer();
