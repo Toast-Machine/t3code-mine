@@ -1848,7 +1848,10 @@ function QueuedMessageTimelineRow({
 }) {
   const ctx = use(TimelineRowCtx);
   const { queuedMessage } = row;
-  const attachmentCount = queuedMessage.images.length + queuedMessage.files.length;
+  // Personal build: attachments show as they will once sent. They are still local,
+  // so images use the composer's preview URLs and videos play from the file itself.
+  const queuedVideos = queuedMessage.files.filter(isVideoAttachment);
+  const queuedFiles = queuedMessage.files.filter((file) => !isVideoAttachment(file));
   const contextCount =
     queuedMessage.terminalContexts.length +
     queuedMessage.previewAnnotations.length +
@@ -1865,21 +1868,47 @@ function QueuedMessageTimelineRow({
   return (
     <div className="flex flex-col items-end" data-queued-message-id={queuedMessage.id}>
       <div className="max-w-[80%] rounded-2xl rounded-br-md border-2 border-message-action/60 border-dashed px-4 py-2.5 text-message-action [--contrast-message-foreground:var(--message-action)] [&_[data-slot=button]]:text-message-action">
+        {queuedMessage.images.length > 0 || queuedVideos.length > 0 ? (
+          <div className="mb-2 grid max-w-[210px] grid-cols-2 gap-2">
+            {queuedMessage.images.map((image) => (
+              <button
+                key={image.id}
+                type="button"
+                className="block aspect-[4/3] cursor-zoom-in overflow-hidden rounded-lg border border-border/80 bg-background/70"
+                aria-label={`Preview ${image.name}`}
+                onClick={() => {
+                  const preview = buildExpandedImagePreview(queuedMessage.images, image.id);
+                  if (preview) ctx.onImageExpand(preview);
+                }}
+              >
+                <img
+                  src={image.previewUrl}
+                  alt={image.name}
+                  className="block size-full object-cover"
+                />
+              </button>
+            ))}
+            {queuedVideos.map((file) => (
+              <QueuedVideoAttachment key={file.id} name={file.name} file={file.file} />
+            ))}
+          </div>
+        ) : null}
+        {queuedFiles.length > 0 ? (
+          <div className="mb-2 flex flex-col gap-1">
+            {queuedFiles.map((file) => (
+              <div key={file.id} className="flex min-w-0 items-center gap-2 py-1 text-sm">
+                <PierreEntryIcon pathValue={file.name} kind="file" theme={ctx.resolvedTheme} />
+                <span className="min-w-0 flex-1 truncate">{file.name}</span>
+              </div>
+            ))}
+          </div>
+        ) : null}
         {text.length > 0 ? (
           <UserMessageBody text={text} skills={ctx.skills} markdownCwd={ctx.markdownCwd} />
         ) : null}
-        {attachmentCount > 0 || contextCount > 0 ? (
+        {contextCount > 0 ? (
           <div className={cn("text-secondary-label text-xs", text.length > 0 && "mt-1.5")}>
-            {[
-              attachmentCount > 0
-                ? `${attachmentCount} attachment${attachmentCount === 1 ? "" : "s"}`
-                : null,
-              contextCount > 0
-                ? `${contextCount} context item${contextCount === 1 ? "" : "s"}`
-                : null,
-            ]
-              .filter(Boolean)
-              .join(", ")}
+            {`${contextCount} context item${contextCount === 1 ? "" : "s"}`}
           </div>
         ) : null}
         <div
@@ -1961,6 +1990,34 @@ function ContextCompactionTimelineRow({
       </span>
       <span className="h-px flex-1 bg-border/70" />
     </div>
+  );
+}
+
+// Personal build: a queued video plays from the local file; it uploads on send.
+function QueuedVideoAttachment({ name, file }: { name: string; file: File | null }) {
+  const [src, setSrc] = useState<string | null>(null);
+  useEffect(() => {
+    if (!file) return;
+    const url = URL.createObjectURL(file);
+    setSrc(url);
+    return () => URL.revokeObjectURL(url);
+  }, [file]);
+  if (!file) {
+    return (
+      <div className="flex aspect-[4/3] w-full items-center justify-center rounded-lg border border-border/80 bg-black px-2 py-3 text-center text-2xs text-white/70">
+        {name}
+      </div>
+    );
+  }
+  return (
+    <MediaVideoPlayer
+      src={src}
+      label={name}
+      preload="visible"
+      className="block aspect-[4/3] w-full"
+      videoClassName="aspect-auto size-full rounded-lg border border-border/80"
+      stateClassName="aspect-auto min-h-full rounded-lg border border-border/80 bg-black text-white"
+    />
   );
 }
 
