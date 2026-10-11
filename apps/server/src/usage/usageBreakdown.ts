@@ -127,9 +127,20 @@ const loadThreadDirectory = Effect.fn("usage.loadThreadDirectory")(function* () 
   } satisfies UsageThreadDirectory;
 });
 
+// Windows paths may arrive with either separator, a \\?\ prefix, or a different
+// drive-letter case, depending on which tool recorded them.
+function comparablePath(path: string): string {
+  const slashed = path
+    .replaceAll("\\", "/")
+    .replace(/^\/\/\?\//, "")
+    .replace(/\/+$/, "");
+  return /^[a-z]:/i.test(slashed) ? slashed.toLowerCase() : slashed;
+}
+
 function within(path: string, root: string): boolean {
-  const base = root.replace(/\/+$/, "");
-  return base.length > 0 && (path === base || path.startsWith(`${base}/`));
+  const base = comparablePath(root);
+  const target = comparablePath(path);
+  return base.length > 0 && (target === base || target.startsWith(`${base}/`));
 }
 
 /** Names each scanned session by its thread and project, falling back to its working directory. */

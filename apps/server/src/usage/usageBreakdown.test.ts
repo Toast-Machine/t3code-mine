@@ -70,6 +70,18 @@ describe("attributeSessions", () => {
     expect(outside?.cwd).toBe("/tmp");
   });
 
+  it("matches Windows working directories however they were recorded", () => {
+    const [result] = attributeSessions(
+      "codex",
+      [session({ sessionId: "win", cwd: "\\\\?\\c:\\Code\\Acme\\src" })],
+      {
+        ...directory,
+        projects: new Map([["p1", { title: "Acme", workspaceRoot: "C:/Code/Acme" }]]),
+      },
+    );
+    expect(result).toMatchObject({ projectId: "p1" });
+  });
+
   it("keeps a deleted thread's title without linking to it", () => {
     const [result] = attributeSessions("codex", [session({ sessionId: "gone" })], {
       ...directory,

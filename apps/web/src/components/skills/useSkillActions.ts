@@ -87,7 +87,7 @@ export function useSkillActions() {
       const confirmed = await readLocalApi()?.dialogs.confirm(
         [
           `Delete the skill "${input.displayName}"?`,
-          "Its folder moves to the Trash. Any other provider that loads it through a link loses it too. If this provider only had a link, just the link is removed.",
+          "Its folder moves to the Trash on a Mac and is deleted permanently elsewhere. Any other provider that loads it through a link loses it too. If this provider only had a link, just the link is removed.",
         ].join("\n"),
         { variant: "destructive" },
       );

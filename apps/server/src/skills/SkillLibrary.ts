@@ -98,6 +98,17 @@ export const make = Effect.gen(function* () {
   const providers = yield* ProviderRegistry;
   const platform = yield* HostProcessPlatform;
 
+  // Windows only lets admins (or Developer Mode) create directory symlinks, so
+  // it gets a junction instead, which must point at an absolute path.
+  const linkSkill = (linkPath: string, canonicalDirectory: string, projectRoot?: string) =>
+    platform === "win32"
+      ? NodeFSP.symlink(canonicalDirectory, linkPath, "junction")
+      : NodeFSP.symlink(
+          skillLinkTarget({ linkPath, canonicalDirectory, projectRoot }),
+          linkPath,
+          "dir",
+        );
+
   const libraryFor = (instanceId: ProviderInstanceId) =>
     Effect.gen(function* () {
       const instance = yield* instances.getInstance(instanceId);
@@ -180,15 +191,7 @@ export const make = Effect.gen(function* () {
       for (const linkPath of links) {
         yield* fileOperation(`Could not link the skill into ${linkPath}.`, async () => {
           await NodeFSP.mkdir(NodePath.dirname(linkPath), { recursive: true });
-          await NodeFSP.symlink(
-            skillLinkTarget({
-              linkPath,
-              canonicalDirectory: canonical,
-              projectRoot: input.projectRoot,
-            }),
-            linkPath,
-            "dir",
-          );
+          await linkSkill(linkPath, canonical, input.projectRoot);
         });
       }
       yield* refreshSkills(skillPath, input.projectRoot);
@@ -235,15 +238,7 @@ export const make = Effect.gen(function* () {
       }
       yield* fileOperation(`Could not link the skill into ${linkPath}.`, async () => {
         await NodeFSP.mkdir(NodePath.dirname(linkPath), { recursive: true });
-        await NodeFSP.symlink(
-          skillLinkTarget({
-            linkPath,
-            canonicalDirectory: canonical,
-            projectRoot: input.projectRoot,
-          }),
-          linkPath,
-          "dir",
-        );
+        await linkSkill(linkPath, canonical, input.projectRoot);
       });
       yield* refreshSkills(linkPath, input.projectRoot);
     });

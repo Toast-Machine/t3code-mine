@@ -329,6 +329,10 @@ export function AppSidebarLayout({ children }: { children: ReactNode }) {
     "--app-rail-width": "3.5rem",
     "--app-rail-inset": "1.125rem",
     "--workspace-controls-top": "var(--app-topbar-height)",
+    // Native window buttons on Windows and Linux sit in the top bar, so panel
+    // headers below it need not leave room for them.
+    "--workspace-controls-right": "calc(env(safe-area-inset-right) + 0.75rem)",
+    "--workspace-native-controls-inset": "0px",
     "--sidebar-width": `${sidebarWidth}px`,
     "--panel-animation-duration": `${panelAnimationDurationMs}ms`,
     // Panel titlebar controls start just inside the panel, right of the rail.

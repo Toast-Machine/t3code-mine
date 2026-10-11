@@ -268,7 +268,7 @@ export const make = Effect.gen(function* () {
       if (info.type === "Directory") {
         if (REBUILDABLE_IGNORED_PATH.test(`${relative}/`)) return true;
         for (const child of yield* fs.readDirectory(target))
-          if (!(yield* visit(path.join(relative, child)))) return false;
+          if (!(yield* visit(`${relative.replace(/\/+$/, "")}/${child}`))) return false;
         return true;
       }
       if (yield* sameAsMainCheckout(worktreePath, root, relative)) return true;
@@ -281,20 +281,38 @@ export const make = Effect.gen(function* () {
   });
 
   // Copies files into a dated folder under worktree-backups, mirroring their
-  // place in the worktree, so they can be restored by hand.
+  // place in the worktree, so they can be restored by hand. A worktree that
+  // already has a backup reuses it: when removal keeps failing (Windows locks
+  // open files), each hourly sweep would otherwise add another full copy.
   const backUp = Effect.fn("StorageCleanup.backUp")(function* (
     worktreePath: string,
     relativeWorktree: string,
     files: ReadonlyArray<string>,
     now: number,
   ) {
+    const parent = path.join(worktreeBackupsDir, path.dirname(relativeWorktree));
+    const backupName = new RegExp(
+      `^${path.basename(relativeWorktree).replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}-\\d{4}(-\\d{2}){4}$`,
+    );
+    const previous = (yield* fs.exists(parent))
+      ? (yield* fs.readDirectory(parent))
+          .filter((name) => backupName.test(name))
+          .toSorted()
+          .at(-1)
+      : undefined;
     const stamp = DateTime.formatIso(DateTime.makeUnsafe(now)).slice(0, 16).replace(/[:T]/g, "-");
-    const destination = path.join(worktreeBackupsDir, `${relativeWorktree}-${stamp}`);
+    const destination =
+      previous === undefined
+        ? path.join(worktreeBackupsDir, `${relativeWorktree}-${stamp}`)
+        : path.join(parent, previous);
     for (const file of files) {
       const target = path.join(destination, file);
       yield* fs.makeDirectory(path.dirname(target), { recursive: true });
       yield* fs.copyFile(path.join(worktreePath, file), target);
     }
+    // Retention counts from the last write, not the first backup. Node reads
+    // numeric times as seconds.
+    yield* fs.utimes(destination, now / 1000, now / 1000);
     return destination;
   });
 

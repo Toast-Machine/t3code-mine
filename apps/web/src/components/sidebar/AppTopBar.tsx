@@ -61,8 +61,9 @@ export function AppTopBar() {
     <header
       data-app-topbar=""
       // pt-2 matches the panel's 0.5rem top margin, so the controls center between
-      // the window top and the panel rather than within the bar alone.
-      className="drag-region fixed inset-x-0 top-0 z-30 hidden h-(--app-topbar-height) items-center gap-3 bg-sidebar-shell ps-(--app-topbar-start) pe-2 pt-2 md:flex [&_button]:[-webkit-app-region:no-drag]"
+      // the window top and the panel rather than within the bar alone. On Windows
+      // and Linux the native window buttons overlay the bar's right end.
+      className="drag-region fixed inset-x-0 top-0 z-30 hidden h-(--app-topbar-height) items-center gap-3 bg-sidebar-shell ps-(--app-topbar-start) pe-(--app-topbar-end) pt-2 md:flex [&_button]:[-webkit-app-region:no-drag]"
     >
       <div className="flex items-center gap-0.5">
         <span className="me-2 inline-flex items-baseline gap-1 text-sm font-medium tracking-tight text-sidebar-foreground">

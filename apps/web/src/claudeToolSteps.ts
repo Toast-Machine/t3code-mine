@@ -42,7 +42,7 @@ function shortTarget(field: string, value: string): string {
       return value;
     }
   }
-  if (field.endsWith("path")) return value.split("/").filter(Boolean).at(-1) ?? value;
+  if (field.endsWith("path")) return value.split(/[\\/]/).filter(Boolean).at(-1) ?? value;
   return value;
 }
 

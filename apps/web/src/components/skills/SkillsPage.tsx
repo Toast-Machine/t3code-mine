@@ -25,7 +25,7 @@ import { isElectron } from "../../env";
 import { useOpenInPreferredEditor } from "../../editorPreferences";
 import { useFileContextMenu, useFileContextMenuHandler } from "../../fileContextMenu";
 import { useCopyToClipboard } from "../../hooks/useCopyToClipboard";
-import { cn } from "../../lib/utils";
+import { cn, isMacPlatform } from "../../lib/utils";
 import { resolveProviderInstanceDisplayName } from "@t3tools/client-runtime/state/provider-instance-display";
 import { useEnvironments } from "../../state/environments";
 import { useProjects } from "../../state/entities";
@@ -832,7 +832,7 @@ function SkillDetail(props: {
               <span className="me-auto text-xs text-muted-foreground">
                 {loadedBy.length > 1
                   ? "Saving updates every provider that loads this skill."
-                  : "⌘S to save, Esc to cancel."}
+                  : `${isMacPlatform(navigator.platform) ? "⌘S" : "Ctrl+S"} to save, Esc to cancel.`}
               </span>
               <Button variant="outline" size="sm" onClick={() => setDraft(null)}>
                 Cancel

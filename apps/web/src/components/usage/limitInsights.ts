@@ -122,7 +122,9 @@ export function mergeBreakdownSessions(
   return [...byKey.values()];
 }
 
-const TEMP_DIRECTORY = /^(\/private)?\/tmp(\/|$)|^\/var\/folders\/|^\/private\/var\/folders\//;
+// Paths are compared with forward slashes, so Windows folders match too.
+const TEMP_DIRECTORY =
+  /^(\/private)?\/tmp(\/|$)|^\/var\/folders\/|^\/private\/var\/folders\/|\/AppData\/Local\/Temp(\/|$)/i;
 
 /**
  * Codex app chats run in a scratch folder under `~/Documents/Codex/`, or in a
@@ -134,9 +136,10 @@ const CODEX_APP_FOLDER = /\/Documents\/Codex\/|\/\.codex\/\.chatgpt-projects\//;
 export function projectLabelOf(session: UsageBreakdownSession): string {
   if (session.projectTitle) return session.projectTitle;
   if (!session.cwd) return "Unknown folder";
-  if (CODEX_APP_FOLDER.test(`${session.cwd}/`)) return "Codex app chats";
-  if (TEMP_DIRECTORY.test(session.cwd)) return "Temporary folder";
-  const parts = session.cwd.split("/").filter(Boolean);
+  const cwd = session.cwd.replaceAll("\\", "/");
+  if (CODEX_APP_FOLDER.test(`${cwd}/`)) return "Codex app chats";
+  if (TEMP_DIRECTORY.test(cwd)) return "Temporary folder";
+  const parts = cwd.split("/").filter(Boolean);
   return parts.at(-1) ?? session.cwd;
 }
 
