@@ -4,12 +4,14 @@ import { useLocation, useNavigate, useRouter } from "@tanstack/react-router";
 import { useEffect } from "react";
 
 import { cn } from "../../lib/utils";
+import { useDesktopUpdateState } from "../../state/desktopUpdate";
 import { useEnvironments } from "../../state/environments";
 import { PullRequestGlyph } from "../pullRequest/pullRequestIcons";
 import { readPullRequestListPreferences } from "../pullRequest/pullRequestListPreferences";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 import { SkillsIcon } from "../skills/SkillsIcon";
 import { ForkUpdateRailButton } from "./ForkUpdateRailButton";
+import { SidebarUpdatePill } from "./SidebarUpdatePill";
 import { useNavigateToMainApp } from "./mainAppLocation";
 
 // Route chunks behind the rail: the thread views and each rail page.
@@ -79,6 +81,8 @@ export function AppRail() {
   const navigateToMainApp = useNavigateToMainApp();
   const pathname = useLocation({ select: (location) => location.pathname });
   const { environments } = useEnvironments();
+  // Builds without an update feed (unsigned Mac builds, the browser) have nothing to offer.
+  const desktopUpdatesEnabled = useDesktopUpdateState()?.enabled === true;
   const router = useRouter();
   // Pages are split chunks. Load every rail destination once the app is idle so
   // switching pages never renders an empty frame while code downloads.
@@ -167,7 +171,16 @@ export function AppRail() {
         <SkillsIcon />
       </RailButton>
       <div className="flex-1" />
-      <ForkUpdateRailButton />
+      {/* The maintainer's builds move the fork onto upstream releases (set at
+          build time; see ForkUpdateRailButton). Everyone else's builds get the
+          fork's own published releases through the app's built-in updater. */}
+      {import.meta.env.VITE_T3_FORK_MAINTAINER === "1" ? (
+        <ForkUpdateRailButton />
+      ) : desktopUpdatesEnabled ? (
+        <ul>
+          <SidebarUpdatePill />
+        </ul>
+      ) : null}
       <RailButton
         label="Settings"
         active={page === "settings"}
