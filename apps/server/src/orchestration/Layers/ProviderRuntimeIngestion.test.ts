@@ -4909,6 +4909,10 @@ describe("ProviderRuntimeIngestion", () => {
         : undefined;
 
     expect(completedPayload?.title).toBe("wait for codex review to finish");
+    // A completion without a type (Claude's report of jobs a previous process
+    // left behind) keeps the job's type, so a shell never reads as a subagent.
+    expect(completedPayload?.taskType).toBe("local_bash");
+    expect(completedPayload?.agentKind).toBe("background");
   });
 
   it("recovers a task title past untitled progress after the cache is swept", async () => {

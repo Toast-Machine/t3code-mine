@@ -2531,20 +2531,26 @@ const make = Effect.gen(function* () {
       }
 
       let taskTitle: string | undefined;
+      // Personal build: Claude reports jobs a previous process left behind
+      // without their type, which classified every old background shell as a
+      // subagent. The type comes from the job's own earlier rows instead.
+      let taskType: string | undefined;
       if (event.type === "task.completed") {
         taskTitle = yield* lookupTaskDescription(thread.id, event.payload.taskId);
-        if (!taskTitle) {
+        if (!taskTitle || event.payload.taskType === undefined) {
           const taskActivity = yield* projectionThreadActivityRepository.getLatestTaskActivity({
             threadId: thread.id,
             taskId: event.payload.taskId,
           });
-          taskTitle = findTaskTitleInActivities(
-            Option.match(taskActivity, {
-              onNone: () => undefined,
-              onSome: (activity) => [activity],
-            }),
-            event.payload.taskId,
-          );
+          const activities = Option.match(taskActivity, {
+            onNone: () => undefined,
+            onSome: (activity) => [activity],
+          });
+          taskTitle ??= findTaskTitleInActivities(activities, event.payload.taskId);
+          const earlierType = Option.isSome(taskActivity)
+            ? (taskActivity.value.payload as { taskType?: unknown } | null)?.taskType
+            : undefined;
+          if (typeof earlierType === "string") taskType = earlierType;
         }
       }
 
@@ -2602,6 +2608,15 @@ const make = Effect.gen(function* () {
         }
       }
 
+      if (activityEvent.type === "task.completed" && taskType !== undefined) {
+        activityEvent = {
+          ...activityEvent,
+          payload: {
+            ...activityEvent.payload,
+            taskType: activityEvent.payload.taskType ?? taskType,
+          },
+        };
+      }
       const activities = runtimeEventToActivities(activityEvent, taskTitle);
       // Personal build: the sidebar's live step ("Running git"). Updates only:
       // a completed step's payload can lack the command its updates carried.
