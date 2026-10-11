@@ -6,7 +6,8 @@
 //
 // So the agent's side is always some work lines, each closed by something you
 // said, and then its answer in a bubble. While it works, the newest line is
-// live ("Reading bin.ts · 12s") and a typing bubble sits where the answer will
+// live ("Reading bin.ts · 12s", the same line the sidebar shows; see
+// liveWorkLine.ts) and a typing bubble sits where the answer will
 // appear. Each line opens to just its own part of the work, in place. A
 // background job finishing is an event: a small centered line.
 //
@@ -14,22 +15,13 @@
 // open state lives in the existing per-group expansion set, keyed by the
 // message that opened each block.
 import { formatDuration } from "@t3tools/shared/orchestrationTiming";
-import * as Equal from "effect/Equal";
 
-import type { WorkLogEntry } from "../../session-logic";
-import { workEntryIsActiveTurnActivity, type MessagesTimelineRow } from "./MessagesTimeline.logic";
+import type { MessagesTimelineRow } from "./MessagesTimeline.logic";
 
 export const CHAT_LIVE_WORK_ROW_ID = "chat-live-work-row";
 export const CHAT_TYPING_ROW_ID = "chat-typing-row";
 
-export type ChatWorkStatus =
-  | { readonly kind: "thinking" }
-  | { readonly kind: "tool"; readonly entry: WorkLogEntry }
-  | { readonly kind: "text"; readonly text: string };
-
 type Row = MessagesTimelineRow;
-
-const THINKING: ChatWorkStatus = { kind: "thinking" };
 
 /** Your answer to a question the agent asked; shown as a reply. */
 export const isQuestionReplyRow = (row: Row): row is Extract<Row, { kind: "work" }> =>
@@ -68,69 +60,6 @@ function rowTurnId(row: Row): string | null {
   }
 }
 
-/** The newest thing the running turn is doing, for the live work line. */
-export function deriveChatWorkStatus(rows: ReadonlyArray<Row>): ChatWorkStatus {
-  for (let index = rows.length - 1; index >= 0; index -= 1) {
-    const row = rows[index]!;
-    switch (row.kind) {
-      case "work-live":
-        return { kind: "tool", entry: row.entry };
-      case "work": {
-        const entry = liveEntry(row.groupedEntries);
-        if (entry) return { kind: "tool", entry };
-        break;
-      }
-      case "work-toggle":
-        return { kind: "text", text: row.summary };
-      case "activity-group": {
-        const lastThought = row.entries.findLastIndex((entry) => entry.kind === "message");
-        const entry = liveEntry(
-          row.entries
-            .slice(lastThought + 1)
-            .flatMap((item) => (item.kind === "work" ? [item.entry] : [])),
-        );
-        return entry ? { kind: "tool", entry } : THINKING;
-      }
-      case "message": {
-        if (row.message.role === "reasoning") return THINKING;
-        if (row.message.role === "assistant") {
-          const text = firstLine(row.message.text);
-          if (text) return { kind: "text", text };
-        }
-        break;
-      }
-      default:
-        break;
-    }
-  }
-  return THINKING;
-}
-
-// A message sent mid-step closes that step's line, but the step keeps running
-// until the agent gets to the message: name it until the new line has work.
-function liveStatus(block: ReadonlyArray<Row>, interrupted: ReadonlyArray<Row>): ChatWorkStatus {
-  const status = deriveChatWorkStatus(block);
-  if (status.kind !== "thinking") return status;
-  const before = deriveChatWorkStatus(interrupted);
-  return before.kind === "tool" && before.entry.toolLifecycleStatus === "inProgress"
-    ? before
-    : status;
-}
-
-// The step still running, not whatever landed last: a background job from an
-// earlier turn stopping mid-turn isn't what the agent is doing now.
-function liveEntry(entries: ReadonlyArray<WorkLogEntry>): WorkLogEntry | undefined {
-  return entries.findLast(workEntryIsActiveTurnActivity) ?? entries.at(-1);
-}
-
-function firstLine(text: string): string {
-  const line = text
-    .split("\n")
-    .map((part) => part.trim())
-    .find((part) => part.length > 0);
-  return (line ?? "").replace(/[*_`#>]/g, "").slice(0, 160);
-}
-
 export function applyChatStyleRows(
   rows: ReadonlyArray<Row>,
   input: {
@@ -153,8 +82,6 @@ export function applyChatStyleRows(
   // on its own: a turn the agent starts without you (a Codex continuation)
   // never folds into the line above the previous turn's answer.
   let blockTurnId: string | null = null;
-  // The work your latest message cut into, for a step it left running.
-  let interruptedBlock: Row[] = [];
 
   const toggleIdFor = (first: Row) => `chat-work:${opener?.id ?? first.id}`;
 
@@ -176,7 +103,6 @@ export function applyChatStyleRows(
         startAt && lastAt
           ? `Worked for ${formatDuration(Date.parse(lastAt) - Date.parse(startAt))}`
           : "Worked",
-      status: THINKING,
     });
     if (expanded) result.push(...block);
     block = [];
@@ -209,7 +135,6 @@ export function applyChatStyleRows(
       expanded,
       live: true,
       label: "",
-      status: liveStatus(block, interruptedBlock),
     });
     if (expanded) result.push(...block);
     result.push({ kind: "chat-typing", id: CHAT_TYPING_ROW_ID, createdAt: live.createdAt });
@@ -289,13 +214,8 @@ export function applyChatStyleRows(
       continue;
     }
     // Something was said or happened: the work so far closes into its own line.
-    if (pendingAnswer) {
-      flushAnswer();
-      interruptedBlock = [];
-    } else {
-      interruptedBlock = block;
-      closeBlock(row.createdAt);
-    }
+    if (pendingAnswer) flushAnswer();
+    else closeBlock(row.createdAt);
     if (isQuestionReplyRow(row)) result.push({ ...row, chatReply: true });
     else if (isBackgroundEventRow(row)) result.push({ ...row, chatEvent: true });
     else result.push(row);
@@ -305,11 +225,4 @@ export function applyChatStyleRows(
   if (live) finishLive();
   else closeBlock(null);
   return result;
-}
-
-export function chatWorkStatusEquals(a: ChatWorkStatus, b: ChatWorkStatus): boolean {
-  if (a.kind !== b.kind) return false;
-  if (a.kind === "tool" && b.kind === "tool") return Equal.equals(a.entry, b.entry);
-  if (a.kind === "text" && b.kind === "text") return a.text === b.text;
-  return true;
 }

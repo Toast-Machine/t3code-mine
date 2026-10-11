@@ -52,6 +52,7 @@ import {
   wasBootstrapThreadNotCreated,
 } from "@t3tools/client-runtime/errors";
 import { readPastedComposerContext } from "./composerInlineTokenPaste";
+import { liveWorkLine } from "./liveWorkLine";
 import { isPasteAsTextShortcut } from "@t3tools/client-runtime/text-paste";
 import { type CodexArtifactTemplate } from "@t3tools/client-runtime/codex-artifact-templates";
 import { effectiveSnoozed, threadWokeAt } from "@t3tools/client-runtime/state/thread-settled";
@@ -2003,6 +2004,11 @@ export default function ChatView(props: ChatViewProps) {
   );
   const activeThreadKey = activeThreadRef ? scopedThreadKey(activeThreadRef) : null;
   const activeThreadShell = useThreadShell(isServerThread ? activeThreadRef : null);
+  // Personal build: the live work line, worked out exactly as the sidebar's.
+  const activeLiveWorkLine = useMemo(
+    () => (activeThreadShell ? liveWorkLine(activeThreadShell) : undefined),
+    [activeThreadShell],
+  );
   const [timelineAnchor, setTimelineAnchor] = useState<{
     readonly threadKey: string | null;
     readonly messageId: MessageId | null;
@@ -9865,6 +9871,7 @@ export default function ChatView(props: ChatViewProps) {
                 isWorking={!paintOnlyDisplayedTimeline && isWorking}
                 isPreparingWorktree={!paintOnlyDisplayedTimeline && isPreparingWorktree}
                 isCompacting={!paintOnlyDisplayedTimeline && isCompacting}
+                liveWorkLine={activeLiveWorkLine}
                 activeTurnStartedAt={paintOnlyDisplayedTimeline ? null : activeWorkStartedAt}
                 worktreeSetup={paintOnlyDisplayedTimeline ? null : worktreeSetup}
                 onCancelWorktreeSetup={onCancelWorktreeSetup}

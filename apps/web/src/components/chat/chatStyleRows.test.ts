@@ -12,7 +12,7 @@ const time = (second: number) => new Date(Date.UTC(2026, 0, 1, 0, 0, second)).to
 
 function message(
   id: string,
-  role: "user" | "assistant" | "reasoning",
+  role: "user" | "assistant",
   text: string,
   second: number,
   turn = turnId,
@@ -163,52 +163,8 @@ describe("applyChatStyleRows", () => {
       id: CHAT_LIVE_WORK_ROW_ID,
       live: true,
       toggleId: "chat-work:steer",
-      status: { kind: "tool", entry: { id: "slider" } },
     });
     expect(rows[4]).toMatchObject({ id: CHAT_TYPING_ROW_ID });
-  });
-
-  it("keeps naming the running step when an older background job stops", () => {
-    const stopped: TimelineEntry = {
-      id: "monitor-stopped",
-      kind: "work",
-      createdAt: time(2),
-      entry: {
-        id: "monitor-stopped",
-        turnId,
-        createdAt: time(2),
-        label: "Leads backfill: stalls, failure spikes",
-        tone: "info",
-        sourceActivityKind: "task.completed",
-        taskId: "monitor",
-        isBackgroundTask: true,
-      },
-    };
-    const entries = [
-      message("user", "user", "Fetch the profiles", 0),
-      message("thought", "reasoning", "Fetching every profile.", 1),
-      tool("fetch", "python3 fetch.py", 1, true),
-      stopped,
-    ];
-    expect(runningRows(entries).find((row) => row.id === CHAT_LIVE_WORK_ROW_ID)).toMatchObject({
-      status: { kind: "tool", entry: { id: "fetch" } },
-    });
-  });
-
-  it("keeps naming a step still running when you send a message mid-step", () => {
-    const entries = [
-      message("user", "user", "Search the archives", 0),
-      tool("search", "curl archive.org", 1, true),
-      message("steer", "user", "Is it only 304?", 2),
-    ];
-    expect(runningRows(entries).find((row) => row.id === CHAT_LIVE_WORK_ROW_ID)).toMatchObject({
-      toggleId: "chat-work:steer",
-      status: { kind: "tool", entry: { id: "search" } },
-    });
-    const finished = [...entries.slice(0, 1), tool("search", "curl archive.org", 1), entries[2]!];
-    expect(runningRows(finished).find((row) => row.id === CHAT_LIVE_WORK_ROW_ID)).toMatchObject({
-      status: { kind: "thinking" },
-    });
   });
 
   it("keeps a live line's open state when the turn settles", () => {

@@ -113,7 +113,7 @@ import {
 } from "../sidebarProjectGrouping";
 import { legacyProjectCwdPreferenceKey, useUiStateStore } from "../uiStateStore";
 import { useThreadShellsWithGrace } from "../threadShellsWithGrace";
-import { sidebarWorkingDetail } from "./sidebarWorkingDetail";
+import { liveWorkLine } from "./liveWorkLine";
 import { sidebarMessagePreview } from "./messagePreview";
 import { isThreadWoke } from "./needsYouCount";
 import { usePinIcon } from "../pinIcons";
@@ -412,7 +412,7 @@ function SidebarThreadTooltip({
   // Personal build: a working chat's card says what it's doing, like its row.
   const latestReply =
     resolveSidebarThreadStatus(thread) === "working"
-      ? sidebarWorkingDetail(thread) || null
+      ? liveWorkLine(thread) || null
       : sidebarMessagePreview(thread.latestAssistantPreview);
   return (
     <TooltipPopup side="right" align="start" sideOffset={4} variant="glass">
@@ -1670,7 +1670,7 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: {
       : null;
   // While the agent works, its last reply is stale: the line says what it's
   // doing now instead.
-  const workingDetails = status === "working" ? sidebarWorkingDetail(thread) : null;
+  const workingDetails = status === "working" ? liveWorkLine(thread) : null;
   const rowDetails =
     (hasUnsentDraft ? draftPreview : null) ??
     failurePreview ??

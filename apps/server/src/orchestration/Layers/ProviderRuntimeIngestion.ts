@@ -2618,15 +2618,16 @@ const make = Effect.gen(function* () {
         };
       }
       const activities = runtimeEventToActivities(activityEvent, taskTitle);
-      // Personal build: the sidebar's live step ("Running git"). Updates only:
-      // a completed step's payload can lack the command its updates carried.
+      // Personal build: what the agent is doing now, for the sidebar and the
+      // chat's live line. Updates start a step (a completed step's payload can
+      // lack the command its updates carried); completions end it.
       for (const activity of activities) {
         if (
           activity.turnId !== null &&
           (activity.kind === "tool.updated" || activity.kind === "task.progress")
         ) {
           threadPlanProgress.recordLiveActivity(thread.id, activity);
-        } else if (activity.kind === "tool.completed") {
+        } else if (activity.kind === "tool.completed" || activity.kind === "task.completed") {
           threadPlanProgress.finishLiveActivity(thread.id, activity);
         }
       }

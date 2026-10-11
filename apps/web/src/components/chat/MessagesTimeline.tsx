@@ -310,6 +310,8 @@ interface TimelineRowActivityState {
   isWorking: boolean;
   isPreparingWorktree: boolean;
   isCompacting: boolean;
+  /** What the agent is doing now (liveWorkLine.ts), for the live work line. */
+  liveWorkLine: string;
   isRevertingCheckpoint: boolean;
   latestTurnId: TurnId | null;
   unsettledTurnId: TurnId | null;
@@ -409,6 +411,8 @@ interface MessagesTimelineProps {
   isWorking: boolean;
   isPreparingWorktree?: boolean;
   isCompacting?: boolean;
+  /** Personal build: what the agent is doing now, the same line the sidebar shows. */
+  liveWorkLine?: string | undefined;
   activeTurnStartedAt: string | null;
   /** Live bootstrap progress for this thread, or null when none is tracked. */
   worktreeSetup?: WorktreeSetupSnapshot | null;
@@ -489,6 +493,7 @@ export const MessagesTimeline = memo(function MessagesTimeline({
   onOpenWorktreeSetupTerminal,
   isPreparingWorktree = false,
   isCompacting = false,
+  liveWorkLine = "Thinking",
   activeTurnStartedAt,
   agentPanelModel,
   onOpenAgents = NOOP_OPEN_AGENTS,
@@ -1252,6 +1257,7 @@ export const MessagesTimeline = memo(function MessagesTimeline({
       isWorking,
       isPreparingWorktree,
       isCompacting,
+      liveWorkLine,
       isRevertingCheckpoint,
       latestTurnId: latestTurn?.turnId ?? null,
       // The same value the row-derivation uses, so a block and the placeholder
@@ -1262,6 +1268,7 @@ export const MessagesTimeline = memo(function MessagesTimeline({
     [
       backgroundWorktreeSetup,
       isCompacting,
+      liveWorkLine,
       isRevertingCheckpoint,
       isWorking,
       isPreparingWorktree,
@@ -2675,7 +2682,7 @@ function ProposedPlanTimelineRow({
 // hides the turn's work right below it.
 function ChatWorkTimelineRow({ row }: { row: Extract<TimelineRow, { kind: "chat-work" }> }) {
   const ctx = use(TimelineRowCtx);
-  const { isCompacting, isPreparingWorktree, backgroundWorktreeSetup } =
+  const { isCompacting, isPreparingWorktree, backgroundWorktreeSetup, liveWorkLine } =
     use(TimelineRowActivityCtx);
   // Compacting writes nothing, so it reads as a centered event, not the agent's work.
   if (row.live && isCompacting && !isPreparingWorktree) {
@@ -2692,16 +2699,9 @@ function ChatWorkTimelineRow({ row }: { row: Extract<TimelineRow, { kind: "chat-
   } else if (isPreparingWorktree) {
     content = <span>Setting up worktree…</span>;
   } else {
-    const status =
-      row.status.kind === "tool"
-        ? (row.status.entry.activeLabel ??
-          liveWorkEntryLabel(row.status.entry, ctx.workspaceRoot, true))
-        : row.status.kind === "text"
-          ? row.status.text
-          : "Thinking";
     content = (
       <>
-        <span className="min-w-0 truncate">{status}</span>
+        <span className="min-w-0 truncate">{liveWorkLine}</span>
         {row.createdAt ? (
           <span className="shrink-0 opacity-70">
             <WorkingTimer createdAt={row.createdAt} />

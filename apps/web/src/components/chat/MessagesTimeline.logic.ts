@@ -31,7 +31,6 @@ import {
 } from "../../session-logic";
 import { type ChatMessage, type ProposedPlan, type TurnDiffSummary } from "../../types";
 import type { QueuedComposerMessage } from "../../queuedMessageStore";
-import { chatWorkStatusEquals, type ChatWorkStatus } from "./chatStyleRows";
 import {
   type MessageId,
   type OrchestrationLatestTurn,
@@ -439,10 +438,9 @@ export type MessagesTimelineRow =
       /** Opens and closes this line's block in the per-group expansion set. */
       toggleId: string;
       expanded: boolean;
-      /** The running block shows live status; closed ones show `label`. */
+      /** The running block shows the live work line; closed ones show `label`. */
       live: boolean;
       label: string;
-      status: ChatWorkStatus;
     }
   | {
       kind: "assistant-meta";
@@ -1664,8 +1662,7 @@ function isRowUnchanged(a: MessagesTimelineRow, b: MessagesTimelineRow): boolean
         a.toggleId === bt.toggleId &&
         a.expanded === bt.expanded &&
         a.live === bt.live &&
-        a.label === bt.label &&
-        chatWorkStatusEquals(a.status, bt.status)
+        a.label === bt.label
       );
     }
     case "worktree-setup":

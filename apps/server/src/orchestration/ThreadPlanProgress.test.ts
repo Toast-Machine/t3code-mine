@@ -66,22 +66,32 @@ describe("ThreadPlanProgress", () => {
     expect(progress.getThreadLiveActivity(threadId)).toBeNull();
   });
 
-  it("forgets the step once it finishes, but not when another one does", () => {
+  it("names the newest step still running, and moves on as steps finish", () => {
     const progress = ThreadPlanProgress.make();
     const threadId = "t-plan-6";
-    const step = (kind: string, toolCallId: string) => ({
-      id: EventId.make(`${kind}-${toolCallId}`),
+    const step = (kind: string, payload: Record<string, unknown>) => ({
+      id: EventId.make(`${kind}-${JSON.stringify(payload)}`),
       tone: "tool" as const,
       kind,
       summary: "Command run",
-      payload: { toolCallId, data: { toolName: "Bash", command: "cat notes.txt" } },
+      payload,
       turnId: TurnId.make("turn-1"),
       createdAt: "2026-01-01T00:00:00.000Z",
     });
-    progress.recordLiveActivity(threadId, step("tool.updated", "call-2"));
-    progress.finishLiveActivity(threadId, step("tool.completed", "call-1"));
-    expect(progress.getThreadLiveActivity(threadId)).not.toBeNull();
-    progress.finishLiveActivity(threadId, step("tool.completed", "call-2"));
+    const current = () =>
+      (progress.getThreadLiveActivity(threadId)?.payload as { toolCallId?: string } | undefined)
+        ?.toolCallId ?? null;
+
+    progress.recordLiveActivity(threadId, step("tool.updated", { toolCallId: "build" }));
+    progress.recordLiveActivity(threadId, step("tool.updated", { toolCallId: "search" }));
+    expect(current()).toBe("search");
+    // An older background job ending doesn't change what the agent is on.
+    progress.finishLiveActivity(threadId, step("task.completed", { taskId: "monitor" }));
+    expect(current()).toBe("search");
+    // When the newest step finishes, the one still running is current again.
+    progress.finishLiveActivity(threadId, step("tool.completed", { toolCallId: "search" }));
+    expect(current()).toBe("build");
+    progress.finishLiveActivity(threadId, step("tool.completed", { toolCallId: "build" }));
     expect(progress.getThreadLiveActivity(threadId)).toBeNull();
   });
 

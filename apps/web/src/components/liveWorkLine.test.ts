@@ -1,7 +1,7 @@
 import { EventId, TurnId } from "@t3tools/contracts";
 import { describe, expect, it } from "vite-plus/test";
 
-import { sidebarWorkingDetail } from "./sidebarWorkingDetail";
+import { liveWorkLine } from "./liveWorkLine";
 
 const turnId = TurnId.make("turn-1");
 const time = (second: number) => new Date(Date.UTC(2026, 0, 1, 0, 0, second)).toISOString();
@@ -38,13 +38,13 @@ const gitActivity = {
   createdAt: time(12),
 };
 
-describe("sidebarWorkingDetail", () => {
+describe("liveWorkLine", () => {
   it("never shows the previous turn's answer", () => {
-    expect(sidebarWorkingDetail(working)).toBe("Thinking");
+    expect(liveWorkLine(working)).toBe("Thinking");
   });
 
   it("names the step the agent is on", () => {
-    expect(sidebarWorkingDetail({ ...working, liveActivity: gitActivity })).toBe("Running git");
+    expect(liveWorkLine({ ...working, liveActivity: gitActivity })).toBe("Running git");
   });
 
   it("names a command the server cut off inside a quoted argument", () => {
@@ -57,7 +57,7 @@ describe("sidebarWorkingDetail", () => {
         data: { toolName: "Bash", command },
       },
     };
-    expect(sidebarWorkingDetail({ ...working, liveActivity: cut })).toBe("Running sqlite3");
+    expect(liveWorkLine({ ...working, liveActivity: cut })).toBe("Running sqlite3");
   });
 
   it("shows the agent's newest note from this turn", () => {
@@ -67,6 +67,6 @@ describe("sidebarWorkingDetail", () => {
       latestAssistantPreview: "Checking how the zoom bar loads.",
       latestAssistantPreviewAt: time(14),
     };
-    expect(sidebarWorkingDetail(note)).toBe("Checking how the zoom bar loads.");
+    expect(liveWorkLine(note)).toBe("Checking how the zoom bar loads.");
   });
 });

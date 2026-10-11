@@ -42,12 +42,14 @@ export class ThreadPlanProgressService extends Context.Service<
     readonly getThreadPlanProgress: (threadId: string) => ThreadPlanProgress | null;
 
     /**
-     * Personal build: the running turn's latest tool step, so the sidebar can
-     * say "Running git" instead of a bare "Working". Cleared with the plan.
+     * Personal build: what the agent is doing right now, for the one line the
+     * sidebar and the chat's live line both show ("Running git"). Each step
+     * stays from its first update until it finishes; the newest one still
+     * running is current. Cleared with the plan.
      */
     readonly recordLiveActivity: (threadId: string, activity: OrchestrationThreadActivity) => void;
 
-    /** The step finished: the sidebar stops naming it until the next one starts. */
+    /** A step finished (tool.completed, task.completed): it stops being current. */
     readonly finishLiveActivity: (threadId: string, activity: OrchestrationThreadActivity) => void;
 
     readonly getThreadLiveActivity: (threadId: string) => OrchestrationThreadActivity | null;
@@ -56,7 +58,8 @@ export class ThreadPlanProgressService extends Context.Service<
 
 export function make(): ThreadPlanProgressService["Service"] {
   const progressByThreadId = new Map<string, ThreadPlanProgress>();
-  const liveActivityByThreadId = new Map<string, OrchestrationThreadActivity>();
+  // Per thread, the steps still running, oldest first.
+  const runningStepsByThreadId = new Map<string, Map<string, OrchestrationThreadActivity>>();
 
   return {
     recordPlanProgress: (threadId, plan) => {
@@ -80,30 +83,40 @@ export function make(): ThreadPlanProgressService["Service"] {
 
     clearThreadPlanProgress: (threadId) => {
       progressByThreadId.delete(threadId);
-      liveActivityByThreadId.delete(threadId);
+      runningStepsByThreadId.delete(threadId);
     },
 
     getThreadPlanProgress: (threadId) => progressByThreadId.get(threadId) ?? null,
 
     recordLiveActivity: (threadId, activity) => {
-      liveActivityByThreadId.set(threadId, { ...activity, payload: trimPayload(activity.payload) });
+      let steps = runningStepsByThreadId.get(threadId);
+      if (!steps) {
+        steps = new Map();
+        runningStepsByThreadId.set(threadId, steps);
+      }
+      const key = stepKeyOf(activity);
+      // Re-inserting keeps a step's place as of its latest update.
+      steps.delete(key);
+      steps.set(key, { ...activity, payload: trimPayload(activity.payload) });
     },
 
     finishLiveActivity: (threadId, activity) => {
-      const live = liveActivityByThreadId.get(threadId);
-      const toolCallId = toolCallIdOf(activity);
-      if (live && toolCallId !== undefined && toolCallIdOf(live) === toolCallId) {
-        liveActivityByThreadId.delete(threadId);
-      }
+      runningStepsByThreadId.get(threadId)?.delete(stepKeyOf(activity));
     },
 
-    getThreadLiveActivity: (threadId) => liveActivityByThreadId.get(threadId) ?? null,
+    getThreadLiveActivity: (threadId) => {
+      const steps = runningStepsByThreadId.get(threadId);
+      return steps ? ([...steps.values()].at(-1) ?? null) : null;
+    },
   };
 }
 
-function toolCallIdOf(activity: OrchestrationThreadActivity): string | undefined {
-  const payload = activity.payload as { toolCallId?: unknown } | null;
-  return typeof payload?.toolCallId === "string" ? payload.toolCallId : undefined;
+// A tool call and a background task are each one step from start to finish.
+function stepKeyOf(activity: OrchestrationThreadActivity): string {
+  const payload = activity.payload as { toolCallId?: unknown; taskId?: unknown } | null;
+  if (typeof payload?.toolCallId === "string") return `tool:${payload.toolCallId}`;
+  if (typeof payload?.taskId === "string") return `task:${payload.taskId}`;
+  return `activity:${activity.id}`;
 }
 
 // The sidebar only needs a step's name and target, but tool payloads carry
