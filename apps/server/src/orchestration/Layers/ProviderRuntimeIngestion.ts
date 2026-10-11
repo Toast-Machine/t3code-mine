@@ -2626,6 +2626,8 @@ const make = Effect.gen(function* () {
           (activity.kind === "tool.updated" || activity.kind === "task.progress")
         ) {
           threadPlanProgress.recordLiveActivity(thread.id, activity);
+        } else if (activity.kind === "tool.completed") {
+          threadPlanProgress.finishLiveActivity(thread.id, activity);
         }
       }
       yield* Effect.forEach(activities, (activity) =>

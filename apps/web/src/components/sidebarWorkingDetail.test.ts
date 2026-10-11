@@ -40,11 +40,24 @@ const gitActivity = {
 
 describe("sidebarWorkingDetail", () => {
   it("never shows the previous turn's answer", () => {
-    expect(sidebarWorkingDetail(working)).toBe("");
+    expect(sidebarWorkingDetail(working)).toBe("Thinking");
   });
 
   it("names the step the agent is on", () => {
     expect(sidebarWorkingDetail({ ...working, liveActivity: gitActivity })).toBe("Running git");
+  });
+
+  it("names a command the server cut off inside a quoted argument", () => {
+    const command = `sqlite3 -readonly state.sqlite "select title from projection_threads where`;
+    const cut = {
+      ...gitActivity,
+      payload: {
+        ...gitActivity.payload,
+        detail: `Bash: ${command}`,
+        data: { toolName: "Bash", command },
+      },
+    };
+    expect(sidebarWorkingDetail({ ...working, liveActivity: cut })).toBe("Running sqlite3");
   });
 
   it("shows the agent's newest note from this turn", () => {

@@ -47,6 +47,9 @@ export class ThreadPlanProgressService extends Context.Service<
      */
     readonly recordLiveActivity: (threadId: string, activity: OrchestrationThreadActivity) => void;
 
+    /** The step finished: the sidebar stops naming it until the next one starts. */
+    readonly finishLiveActivity: (threadId: string, activity: OrchestrationThreadActivity) => void;
+
     readonly getThreadLiveActivity: (threadId: string) => OrchestrationThreadActivity | null;
   }
 >()("t3/orchestration/ThreadPlanProgress/ThreadPlanProgressService") {}
@@ -86,8 +89,21 @@ export function make(): ThreadPlanProgressService["Service"] {
       liveActivityByThreadId.set(threadId, { ...activity, payload: trimPayload(activity.payload) });
     },
 
+    finishLiveActivity: (threadId, activity) => {
+      const live = liveActivityByThreadId.get(threadId);
+      const toolCallId = toolCallIdOf(activity);
+      if (live && toolCallId !== undefined && toolCallIdOf(live) === toolCallId) {
+        liveActivityByThreadId.delete(threadId);
+      }
+    },
+
     getThreadLiveActivity: (threadId) => liveActivityByThreadId.get(threadId) ?? null,
   };
+}
+
+function toolCallIdOf(activity: OrchestrationThreadActivity): string | undefined {
+  const payload = activity.payload as { toolCallId?: unknown } | null;
+  return typeof payload?.toolCallId === "string" ? payload.toolCallId : undefined;
 }
 
 // The sidebar only needs a step's name and target, but tool payloads carry

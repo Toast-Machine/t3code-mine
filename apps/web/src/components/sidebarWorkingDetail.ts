@@ -2,7 +2,8 @@
 // Like a messages app showing "typing…" instead of the old message: the
 // agent's note from this turn ("Checking how the zoom bar loads"), or else
 // the step it's on, named the same way the chat's live line names it
-// ("Running git"). The previous turn's answer is stale, so it never shows.
+// ("Running git"), or "Thinking" between steps. The previous turn's answer is
+// stale, so it never shows.
 import { deriveWorkLogEntries } from "../session-logic";
 import type { SidebarThreadSummary } from "../types";
 import { liveWorkEntryLabel } from "./chat/MessagesTimeline.logic";
@@ -32,6 +33,29 @@ export function sidebarWorkingDetail(
       ? sidebarMessagePreview(thread.latestAssistantPreview)
       : null;
   if (note) return note;
-  if (step) return step.activeLabel ?? liveWorkEntryLabel(step, undefined, true);
-  return thread.planProgress?.step ?? "";
+  if (step) {
+    const named = step.command ? { ...step, command: closeCutQuote(step.command) } : step;
+    return step.activeLabel ?? liveWorkEntryLabel(named, undefined, true);
+  }
+  // Nothing running: the same word the chat's live line uses.
+  return thread.planProgress?.step ?? "Thinking";
+}
+
+// The server cuts the live step's strings short (ThreadPlanProgress.ts), often
+// inside a quoted argument, and an unclosed quote stops the command's program
+// name from parsing ("Running command" instead of "Running sqlite3").
+export function closeCutQuote(command: string): string {
+  let open: "'" | '"' | null = null;
+  for (let index = 0; index < command.length; index += 1) {
+    const char = command[index];
+    if (open === null) {
+      if (char === "\\") index += 1;
+      else if (char === "'" || char === '"') open = char;
+    } else if (open === '"' && char === "\\") {
+      index += 1;
+    } else if (char === open) {
+      open = null;
+    }
+  }
+  return open === null ? command : command + open;
 }

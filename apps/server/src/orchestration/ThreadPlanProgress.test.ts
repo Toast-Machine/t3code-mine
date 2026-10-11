@@ -66,6 +66,25 @@ describe("ThreadPlanProgress", () => {
     expect(progress.getThreadLiveActivity(threadId)).toBeNull();
   });
 
+  it("forgets the step once it finishes, but not when another one does", () => {
+    const progress = ThreadPlanProgress.make();
+    const threadId = "t-plan-6";
+    const step = (kind: string, toolCallId: string) => ({
+      id: EventId.make(`${kind}-${toolCallId}`),
+      tone: "tool" as const,
+      kind,
+      summary: "Command run",
+      payload: { toolCallId, data: { toolName: "Bash", command: "cat notes.txt" } },
+      turnId: TurnId.make("turn-1"),
+      createdAt: "2026-01-01T00:00:00.000Z",
+    });
+    progress.recordLiveActivity(threadId, step("tool.updated", "call-2"));
+    progress.finishLiveActivity(threadId, step("tool.completed", "call-1"));
+    expect(progress.getThreadLiveActivity(threadId)).not.toBeNull();
+    progress.finishLiveActivity(threadId, step("tool.completed", "call-2"));
+    expect(progress.getThreadLiveActivity(threadId)).toBeNull();
+  });
+
   it("leaves dropped parts out of the step, so it stays valid JSON", () => {
     const progress = ThreadPlanProgress.make();
     const threadId = "t-plan-5";
