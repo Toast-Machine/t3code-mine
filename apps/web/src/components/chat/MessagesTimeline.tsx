@@ -2620,14 +2620,20 @@ function ChatWorkTimelineRow({ row }: { row: Extract<TimelineRow, { kind: "chat-
   const ctx = use(TimelineRowCtx);
   const { isCompacting, isPreparingWorktree, backgroundWorktreeSetup } =
     use(TimelineRowActivityCtx);
+  // Compacting writes nothing, so it reads as a centered event, not the agent's work.
+  if (row.live && isCompacting && !isPreparingWorktree) {
+    return (
+      <div className="flex justify-center py-0.5 text-muted-foreground text-xs">
+        <CompactingLabel />
+      </div>
+    );
+  }
   const Icon = row.expanded ? ChevronDownIcon : ChevronRightIcon;
   let content: ReactNode;
   if (!row.live) {
     content = <span>{row.label}</span>;
   } else if (isPreparingWorktree) {
     content = <span>Setting up worktree…</span>;
-  } else if (isCompacting) {
-    content = <CompactingLabel />;
   } else {
     const status =
       row.status.kind === "tool"
@@ -2654,7 +2660,7 @@ function ChatWorkTimelineRow({ row }: { row: Extract<TimelineRow, { kind: "chat-
         aria-expanded={row.expanded}
         data-scroll-anchor-ignore
         onClick={() => ctx.onToggleWorkGroup(row.toggleId, row.id)}
-        className="flex min-w-0 cursor-pointer select-none items-center gap-2 rounded-md py-0.5 text-muted-foreground text-xs tabular-nums transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/70"
+        className="-mx-1.5 flex min-w-0 cursor-pointer select-none items-center gap-2 rounded-md px-1.5 py-0.5 text-muted-foreground text-xs tabular-nums transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/70"
       >
         {content}
         <Icon className="size-3.5 shrink-0" />
@@ -2667,8 +2673,10 @@ function ChatWorkTimelineRow({ row }: { row: Extract<TimelineRow, { kind: "chat-
 }
 
 // Personal build: while the agent works, a typing bubble sits where its answer
-// will appear.
+// will appear. Compacting writes no answer, so it gets none.
 function ChatTypingTimelineRow() {
+  const { isCompacting } = use(TimelineRowActivityCtx);
+  if (isCompacting) return null;
   return (
     <div className="mt-2 flex w-fit items-center rounded-2xl rounded-bl-md bg-accent px-4 py-3">
       <TypingDots />
