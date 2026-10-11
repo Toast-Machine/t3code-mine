@@ -6,10 +6,12 @@ import {
   type ServerConfig,
 } from "@t3tools/contracts";
 import * as Cause from "effect/Cause";
+import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
 import * as Option from "effect/Option";
 import * as Queue from "effect/Queue";
 import * as Ref from "effect/Ref";
+import * as Schedule from "effect/Schedule";
 import * as Stream from "effect/Stream";
 import * as SubscriptionRef from "effect/SubscriptionRef";
 import { AsyncResult, Atom } from "effect/unstable/reactivity";
@@ -257,7 +259,20 @@ export const makeEnvironmentShellState = Effect.fn("EnvironmentShellState.make")
         retryExpectedFailureAfter: "250 millis",
         resubscribe: foregroundResubscriptions,
       },
-    ).pipe(Stream.runForEachArray(applyItems)),
+    ).pipe(
+      Stream.runForEachArray(applyItems),
+      // Personal build: a defect, such as one item failing to decode, used to
+      // end this stream for good while the socket stayed up, so the thread
+      // list froze until a restart. Report it and subscribe again instead.
+      Effect.tapCause((cause) =>
+        Cause.hasInterruptsOnly(cause) ? Effect.void : setStreamError(Cause.squash(cause)),
+      ),
+      Effect.sandbox,
+      Effect.retry({
+        schedule: SHELL_RESUBSCRIBE_SCHEDULE,
+        while: (cause) => !Cause.hasInterruptsOnly(cause),
+      }),
+    ),
   );
   yield* SubscriptionRef.changes(supervisor.state).pipe(
     Stream.runForEach((connectionState) => {
@@ -275,6 +290,13 @@ export const makeEnvironmentShellState = Effect.fn("EnvironmentShellState.make")
 
   return state;
 });
+
+// Personal build: backoff for resubscribing after the shell stream fails.
+const SHELL_RESUBSCRIBE_SCHEDULE = Schedule.exponential("1 second").pipe(
+  Schedule.modifyDelay(({ duration }) =>
+    Effect.succeed(Duration.min(duration, Duration.seconds(30))),
+  ),
+);
 
 function shellStateChanges(environmentId: EnvironmentId) {
   return followStreamInEnvironment(

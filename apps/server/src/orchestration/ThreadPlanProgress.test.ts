@@ -65,4 +65,28 @@ describe("ThreadPlanProgress", () => {
     progress.clearThreadPlanProgress(threadId);
     expect(progress.getThreadLiveActivity(threadId)).toBeNull();
   });
+
+  it("leaves dropped parts out of the step, so it stays valid JSON", () => {
+    const progress = ThreadPlanProgress.make();
+    const threadId = "t-plan-5";
+    progress.recordLiveActivity(threadId, {
+      id: EventId.make("activity-2"),
+      tone: "tool",
+      kind: "tool.updated",
+      summary: "Tool call",
+      payload: {
+        data: {
+          toolName: "AskUserQuestion",
+          input: { questions: [{ question: "Which phone?" }], skip: undefined },
+        },
+      },
+      turnId: TurnId.make("turn-1"),
+      createdAt: "2026-01-01T00:00:00.000Z",
+    });
+    const payload = progress.getThreadLiveActivity(threadId)?.payload;
+    expect(payload).toEqual({
+      data: { toolName: "AskUserQuestion", input: { questions: [] } },
+    });
+    expect(JSON.parse(JSON.stringify(payload))).toEqual(payload);
+  });
 });

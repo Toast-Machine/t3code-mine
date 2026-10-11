@@ -92,21 +92,30 @@ export function make(): ThreadPlanProgressService["Service"] {
 
 // The sidebar only needs a step's name and target, but tool payloads carry
 // whole file bodies and outputs. Every shell push sends this, so long strings
-// are cut and deep structures dropped.
+// are cut and deep structures dropped. Dropped values are left out, never
+// `undefined`: the client decodes the payload as JSON, and one `undefined`
+// fails the whole shell stream.
 const MAX_STRING_LENGTH = 200;
 const MAX_DEPTH = 4;
+
+const isKept = (value: unknown) => value !== undefined;
 
 function trimPayload(value: unknown, depth = 0): unknown {
   if (typeof value === "string") {
     return value.length > MAX_STRING_LENGTH ? value.slice(0, MAX_STRING_LENGTH) : value;
   }
-  if (value === null || typeof value !== "object") return value;
-  if (depth >= MAX_DEPTH) return undefined;
+  if (typeof value === "number" || typeof value === "boolean" || value === null) return value;
+  if (typeof value !== "object" || depth >= MAX_DEPTH) return undefined;
   if (Array.isArray(value)) {
-    return value.slice(0, 8).map((item) => trimPayload(item, depth + 1));
+    return value
+      .slice(0, 8)
+      .map((item) => trimPayload(item, depth + 1))
+      .filter(isKept);
   }
   return Object.fromEntries(
-    Object.entries(value).map(([key, item]) => [key, trimPayload(item, depth + 1)]),
+    Object.entries(value)
+      .map(([key, item]) => [key, trimPayload(item, depth + 1)] as const)
+      .filter(([, item]) => isKept(item)),
   );
 }
 
