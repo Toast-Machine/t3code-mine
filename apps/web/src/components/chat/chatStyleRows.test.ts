@@ -201,6 +201,40 @@ describe("applyChatStyleRows", () => {
     ]);
   });
 
+  it("keeps a job that finishes mid-turn as a step, not an event that splits the line", () => {
+    const typecheckDone: TimelineEntry = {
+      id: "typecheck-done",
+      kind: "work",
+      createdAt: time(2),
+      entry: {
+        id: "typecheck-done",
+        turnId,
+        createdAt: time(2),
+        label: "Run all typechecks",
+        tone: "info",
+        sourceActivityKind: "task.completed",
+        taskId: "typecheck",
+        isBackgroundTask: true,
+      },
+    };
+    const entries = [
+      message("user", "user", "Check the build", 0),
+      tool("start", "vp run typecheck", 1),
+      typecheckDone,
+      tool("test", "vp test run", 3),
+      message("reply", "assistant", "All green.", 4),
+    ];
+    const rows = settledRows(entries, new Set(["chat-work:user"]));
+    expect(rows.map((row) => row.id)).toEqual([
+      "user",
+      "chat-work:user",
+      "start",
+      "typecheck-done",
+      "test",
+      "reply",
+    ]);
+  });
+
   it("opens a background event's details right under it", () => {
     const jobDone: TimelineEntry = {
       id: "job-done",

@@ -1174,6 +1174,25 @@ export function deriveMessagesTimelineRows(input: {
     );
   };
 
+  // Personal build (flatWork): a background job finishing is an event only
+  // between turns. One that lands while its turn is still going (the turn is
+  // running, or more of its work follows) is a step of that turn.
+  const isChatEventAt = (index: number) => {
+    const timelineEntry = input.timelineEntries[index];
+    if (timelineEntry?.kind !== "work" || !isBackgroundCompletion(timelineEntry.entry)) {
+      return false;
+    }
+    const turnId = timelineEntry.entry.turnId;
+    if (!turnId) return true;
+    if (input.isWorking && turnId === unsettledTurnId) return false;
+    for (let next = index + 1; next < input.timelineEntries.length; next += 1) {
+      const entry = input.timelineEntries[next]!;
+      if (entry.kind === "work" && isBackgroundCompletion(entry.entry)) continue;
+      return timelineEntryTurnId(entry) !== turnId;
+    }
+    return true;
+  };
+
   let scannedActivityThrough = -1;
   for (let index = 0; index < input.timelineEntries.length; index += 1) {
     const timelineEntry = input.timelineEntries[index];
@@ -1306,10 +1325,7 @@ export function deriveMessagesTimelineRows(input: {
           activeWorkEntryIds.has(nextEntry.id) ||
           collapsedEntryIds.has(nextEntry.id) ||
           foldsByAnchorEntryId.has(nextEntry.id) ||
-          (input.flatWork &&
-            !(
-              isBackgroundCompletion(timelineEntry.entry) && isBackgroundCompletion(nextEntry.entry)
-            ))
+          (input.flatWork && !(isChatEventAt(index) && isChatEventAt(cursor)))
         ) {
           break;
         }
@@ -1347,7 +1363,7 @@ export function deriveMessagesTimelineRows(input: {
         } else if (
           visibleGroupedEntries.length === 1 &&
           (workLogEntryIsToolLike(visibleGroupedEntries[0]!) ||
-            (input.flatWork && !isBackgroundCompletion(visibleGroupedEntries[0]!)))
+            (input.flatWork && !isChatEventAt(index)))
         ) {
           const singleEntry = visibleGroupedEntries[0]!;
           nextRows.push({
@@ -1411,7 +1427,11 @@ export function deriveMessagesTimelineRows(input: {
             hasFailure:
               latestToolEntry !== undefined &&
               workEntryDisplayIndicatesToolFailure(latestToolEntry),
-            ...(visibleGroupedEntries.every(isBackgroundCompletion)
+            ...((
+              input.flatWork
+                ? isChatEventAt(index)
+                : visibleGroupedEntries.every(isBackgroundCompletion)
+            )
               ? { isBackgroundEvent: true as const }
               : {}),
           });
