@@ -17,7 +17,7 @@ import { formatDuration } from "@t3tools/shared/orchestrationTiming";
 import * as Equal from "effect/Equal";
 
 import type { WorkLogEntry } from "../../session-logic";
-import type { MessagesTimelineRow } from "./MessagesTimeline.logic";
+import { workEntryIsActiveTurnActivity, type MessagesTimelineRow } from "./MessagesTimeline.logic";
 
 export const CHAT_LIVE_WORK_ROW_ID = "chat-live-work-row";
 export const CHAT_TYPING_ROW_ID = "chat-typing-row";
@@ -76,15 +76,20 @@ export function deriveChatWorkStatus(rows: ReadonlyArray<Row>): ChatWorkStatus {
       case "work-live":
         return { kind: "tool", entry: row.entry };
       case "work": {
-        const entry = row.groupedEntries.at(-1);
+        const entry = liveEntry(row.groupedEntries);
         if (entry) return { kind: "tool", entry };
         break;
       }
       case "work-toggle":
         return { kind: "text", text: row.summary };
       case "activity-group": {
-        const last = row.entries.at(-1);
-        return last?.kind === "work" ? { kind: "tool", entry: last.entry } : THINKING;
+        const lastThought = row.entries.findLastIndex((entry) => entry.kind === "message");
+        const entry = liveEntry(
+          row.entries
+            .slice(lastThought + 1)
+            .flatMap((item) => (item.kind === "work" ? [item.entry] : [])),
+        );
+        return entry ? { kind: "tool", entry } : THINKING;
       }
       case "message": {
         if (row.message.role === "reasoning") return THINKING;
@@ -99,6 +104,12 @@ export function deriveChatWorkStatus(rows: ReadonlyArray<Row>): ChatWorkStatus {
     }
   }
   return THINKING;
+}
+
+// The step still running, not whatever landed last: a background job from an
+// earlier turn stopping mid-turn isn't what the agent is doing now.
+function liveEntry(entries: ReadonlyArray<WorkLogEntry>): WorkLogEntry | undefined {
+  return entries.findLast(workEntryIsActiveTurnActivity) ?? entries.at(-1);
 }
 
 function firstLine(text: string): string {

@@ -12,7 +12,7 @@ const time = (second: number) => new Date(Date.UTC(2026, 0, 1, 0, 0, second)).to
 
 function message(
   id: string,
-  role: "user" | "assistant",
+  role: "user" | "assistant" | "reasoning",
   text: string,
   second: number,
   turn = turnId,
@@ -166,6 +166,33 @@ describe("applyChatStyleRows", () => {
       status: { kind: "tool", entry: { id: "slider" } },
     });
     expect(rows[4]).toMatchObject({ id: CHAT_TYPING_ROW_ID });
+  });
+
+  it("keeps naming the running step when an older background job stops", () => {
+    const stopped: TimelineEntry = {
+      id: "monitor-stopped",
+      kind: "work",
+      createdAt: time(2),
+      entry: {
+        id: "monitor-stopped",
+        turnId,
+        createdAt: time(2),
+        label: "Leads backfill: stalls, failure spikes",
+        tone: "info",
+        sourceActivityKind: "task.completed",
+        taskId: "monitor",
+        isBackgroundTask: true,
+      },
+    };
+    const entries = [
+      message("user", "user", "Fetch the profiles", 0),
+      message("thought", "reasoning", "Fetching every profile.", 1),
+      tool("fetch", "python3 fetch.py", 1, true),
+      stopped,
+    ];
+    expect(runningRows(entries).find((row) => row.id === CHAT_LIVE_WORK_ROW_ID)).toMatchObject({
+      status: { kind: "tool", entry: { id: "fetch" } },
+    });
   });
 
   it("keeps a live line's open state when the turn settles", () => {
