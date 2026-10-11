@@ -270,6 +270,8 @@ import { ComputerUseAppIcon } from "~/components/Icons";
 // ---------------------------------------------------------------------------
 
 interface TimelineRowSharedState {
+  /** Personal build: rows render inside the chat layout's work lines. */
+  chatStyle: boolean;
   citationRequest: AssistantCitationTarget | null;
   listRef: React.RefObject<LegendListRef | null>;
   timestampFormat: TimestampFormat;
@@ -808,6 +810,7 @@ export const MessagesTimeline = memo(function MessagesTimeline({
         runningTurnId,
         // Personal build: the chat layout folds work itself (see chatStyleRows.ts).
         expandedTurnIds: chatStyle ? everyTurnId : paintedExpandedTurnIds,
+        flatWork: chatStyle,
         expandedWorkGroupIds: paintedExpandedWorkGroupIds,
         isWorking,
         activeTurnStartedAt,
@@ -1176,6 +1179,7 @@ export const MessagesTimeline = memo(function MessagesTimeline({
 
   const sharedState = useMemo<TimelineRowSharedState>(
     () => ({
+      chatStyle,
       citationRequest: readyCitationRequest,
       listRef,
       timestampFormat,
@@ -1213,6 +1217,7 @@ export const MessagesTimeline = memo(function MessagesTimeline({
       onRemoveQueuedMessage,
     }),
     [
+      chatStyle,
       readyCitationRequest,
       listRef,
       timestampFormat,
@@ -4994,7 +4999,7 @@ const PlainWorkEntryRow = memo(function PlainWorkEntryRow(props: {
   onToggleEntry?: ((collapsed: boolean) => void) | undefined;
 }) {
   const { workEntry, workspaceRoot, isExpandedToolGroupEntry, displayLabel } = props;
-  const { threadRef, onImageExpand, timestampFormat } = use(TimelineRowCtx);
+  const { threadRef, onImageExpand, timestampFormat, chatStyle } = use(TimelineRowCtx);
   const groupView = use(WorkGroupViewCtx);
   const [expanded, setExpanded] = useState(
     () => groupView?.state.expandedEntries.has(workEntry.id) ?? false,
@@ -5028,8 +5033,15 @@ const PlainWorkEntryRow = memo(function PlainWorkEntryRow(props: {
   const questionHeading = workEntry.questionAnswer
     ? getQuestionTextPreview(workEntry.questionAnswer)
     : "";
+  // Personal build: in the chat layout a step reads like the live line ("Ran
+  // grep", "Read bin.ts"); the full command is in the step's opened panel.
   const previewText =
-    displayLabel ?? (questionHeading || workEntryDisplayLabel(workEntry, workspaceRoot));
+    questionHeading ||
+    (chatStyle
+      ? workEntry.toolLifecycleStatus === "inProgress"
+        ? (workEntry.activeLabel ?? liveWorkEntryLabel(workEntry, workspaceRoot, true))
+        : liveWorkEntryLabel(workEntry, workspaceRoot, false)
+      : (displayLabel ?? workEntryDisplayLabel(workEntry, workspaceRoot)));
   const answerPreview =
     workEntry.questionAnswer && hasQuestionAnswer(workEntry.questionAnswer)
       ? getQuestionAnswerPreview(workEntry.questionAnswer)
@@ -5042,10 +5054,6 @@ const PlainWorkEntryRow = memo(function PlainWorkEntryRow(props: {
           workspaceRoot,
         })
       : null;
-  // Personal build: a row only opens when opening shows something. Detail that
-  // repeats the row's own label (a background job's one-line summary) used to
-  // open an empty panel. MCP payloads are stringified only once opened.
-  const hasMcpData = workEntry.itemType === "mcp_tool_call" && workEntry.toolData !== undefined;
   const buildBody = () =>
     buildToolCallExpandedBody(
       workEntry,
@@ -5053,15 +5061,25 @@ const PlainWorkEntryRow = memo(function PlainWorkEntryRow(props: {
       previewText,
       viewedImage ? viewedImagePath : null,
     );
-  const textBody = hasMcpData ? null : buildBody();
-  const canExpand =
-    Boolean(workEntry.questionAnswer) ||
-    // Opening a failure unwraps its full message.
-    (showFailedIndicator && previewText.trim().length > 0) ||
-    Boolean(viewedImage) ||
-    hasMcpData ||
-    textBody !== null;
-  const expandedBody = expanded ? (hasMcpData ? buildBody() : textBody) : null;
+  const hasMcpData = workEntry.itemType === "mcp_tool_call" && workEntry.toolData !== undefined;
+  // Personal build: in the chat layout the label stays one line and opening
+  // shows a panel, so a step only opens when that panel has something in it
+  // (a background job's one-line summary used to open an empty one). MCP
+  // payloads are stringified only once opened.
+  const chatBody = chatStyle && !hasMcpData ? buildBody() : null;
+  const canExpand = chatStyle
+    ? Boolean(workEntry.questionAnswer) || Boolean(viewedImage) || hasMcpData || chatBody !== null
+    : Boolean(workEntry.questionAnswer) ||
+      (showFailedIndicator && previewText.trim().length > 0) ||
+      hasMcpData ||
+      Boolean(
+        workEntryRawCommand(workEntry) ||
+        workEntry.command?.trim() ||
+        workEntry.detail?.trim() ||
+        workEntry.changedFiles?.length ||
+        viewedImage,
+      );
+  const expandedBody = expanded ? (chatBody ?? buildBody()) : null;
   // Reserve destructive row styling for severe failures, not routine tool errors.
   const iconWrapperClass = cn(
     "flex size-6 shrink-0 items-center justify-center",
@@ -5132,7 +5150,9 @@ const PlainWorkEntryRow = memo(function PlainWorkEntryRow(props: {
               <span
                 className={cn(
                   answerPreview ? "min-w-0" : "min-w-0 flex-1",
-                  expanded ? "whitespace-pre-wrap break-words select-text" : "truncate",
+                  expanded && !chatStyle
+                    ? "whitespace-pre-wrap break-words select-text"
+                    : "truncate",
                   headingClass,
                 )}
                 onClick={expanded ? stopRowToggleWhileSelectingText : undefined}
@@ -5161,7 +5181,12 @@ const PlainWorkEntryRow = memo(function PlainWorkEntryRow(props: {
           !toolIconAcceptsTint(entryIconName, entryToolIcon) ? (
             <XIcon aria-hidden className={cn("size-3 shrink-0", failedToolIconClassName)} />
           ) : null}
-          <TimelineRowTimestamp createdAt={workEntry.createdAt} timestampFormat={timestampFormat} />
+          {chatStyle ? null : (
+            <TimelineRowTimestamp
+              createdAt={workEntry.createdAt}
+              timestampFormat={timestampFormat}
+            />
+          )}
           <span
             className={cn(
               "flex size-4 shrink-0 items-center justify-center",

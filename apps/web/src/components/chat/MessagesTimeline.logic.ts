@@ -521,6 +521,10 @@ function workGroupId(timelineEntryId: string, entry: WorkLogEntry): string {
   return `work-group:${workGroupIdentity(timelineEntryId, entry)}`;
 }
 
+/** A background job finishing: an event between turns, not a step of the work. */
+const isBackgroundCompletion = (entry: WorkLogEntry) =>
+  entry.isBackgroundTask === true && entry.sourceActivityKind === "task.completed";
+
 function expandedWorkGroupRow(
   groupId: string,
   createdAt: string,
@@ -1010,6 +1014,13 @@ export function deriveMessagesTimelineRows(input: {
   worktreeSetup?: WorktreeSetupSnapshot | null;
   /** Messages sent during the running turn, rendered after the live rows. */
   queuedMessages?: ReadonlyArray<QueuedComposerMessage>;
+  /**
+   * Personal build: one row per step, thought, and note, with no tool groups,
+   * live rows, or thought groups. The chat layout folds the turn's work into
+   * one line itself (chatStyleRows.ts), so grouping inside it again only
+   * nests. Background jobs finishing still group into one event.
+   */
+  flatWork?: boolean;
 }): MessagesTimelineRow[] {
   const turnDiffSummaryByAssistantMessageId = new Map<MessageId, TurnDiffSummary>();
   for (const summary of input.turnDiffSummaries) {
@@ -1112,7 +1123,7 @@ export function deriveMessagesTimelineRows(input: {
           !workEntryDisplayIndicatesToolFailure(latestVisibleToolEntry.entry))));
   const activeWorkPlacementEntryId = latestVisibleToolEntry?.id;
   const activeWorkRow =
-    activeWorkAnchor && latestVisibleToolEntry && !latestToolFailed
+    !input.flatWork && activeWorkAnchor && latestVisibleToolEntry && !latestToolFailed
       ? (() => {
           const groupId = workGroupId(activeWorkAnchor.id, activeWorkAnchor.entry);
           return {
@@ -1130,7 +1141,9 @@ export function deriveMessagesTimelineRows(input: {
         })()
       : null;
   const activeWorkEntryIds = new Set(
-    activeWorkRow !== null || latestToolFailed ? activeToolEntries.map((entry) => entry.id) : [],
+    !input.flatWork && (activeWorkRow !== null || latestToolFailed)
+      ? activeToolEntries.map((entry) => entry.id)
+      : [],
   );
   const appendWorkingRow = () => {
     const latestUserMessage = input.timelineEntries[lastUserMessageIndex(input.timelineEntries)];
@@ -1193,7 +1206,12 @@ export function deriveMessagesTimelineRows(input: {
     }
 
     const activityTurnId = timelineEntryTurnId(timelineEntry);
-    if (index > scannedActivityThrough && activityTurnId && isActivityEntry(timelineEntry)) {
+    if (
+      !input.flatWork &&
+      index > scannedActivityThrough &&
+      activityTurnId &&
+      isActivityEntry(timelineEntry)
+    ) {
       const entries = [timelineEntry];
       let cursor = index + 1;
       while (cursor < input.timelineEntries.length) {
@@ -1287,7 +1305,11 @@ export function deriveMessagesTimelineRows(input: {
           nextEntry.entry.tone === "error" ||
           activeWorkEntryIds.has(nextEntry.id) ||
           collapsedEntryIds.has(nextEntry.id) ||
-          foldsByAnchorEntryId.has(nextEntry.id)
+          foldsByAnchorEntryId.has(nextEntry.id) ||
+          (input.flatWork &&
+            !(
+              isBackgroundCompletion(timelineEntry.entry) && isBackgroundCompletion(nextEntry.entry)
+            ))
         ) {
           break;
         }
@@ -1302,7 +1324,7 @@ export function deriveMessagesTimelineRows(input: {
       );
       if (visibleGroupedEntries.length > 0) {
         const activeInProgressToolEntries = visibleGroupedEntries.filter(workEntryIsInActiveRun);
-        if (activeInProgressToolEntries.length > 0) {
+        if (activeInProgressToolEntries.length > 0 && !input.flatWork) {
           const groupId = workGroupId(timelineEntry.id, timelineEntry.entry);
           const expanded = input.expandedWorkGroupIds?.has(groupId) ?? false;
           const latestActiveToolEntry = activeInProgressToolEntries.at(-1)!;
@@ -1324,7 +1346,8 @@ export function deriveMessagesTimelineRows(input: {
           }
         } else if (
           visibleGroupedEntries.length === 1 &&
-          workLogEntryIsToolLike(visibleGroupedEntries[0]!)
+          (workLogEntryIsToolLike(visibleGroupedEntries[0]!) ||
+            (input.flatWork && !isBackgroundCompletion(visibleGroupedEntries[0]!)))
         ) {
           const singleEntry = visibleGroupedEntries[0]!;
           nextRows.push({
@@ -1388,9 +1411,7 @@ export function deriveMessagesTimelineRows(input: {
             hasFailure:
               latestToolEntry !== undefined &&
               workEntryDisplayIndicatesToolFailure(latestToolEntry),
-            ...(visibleGroupedEntries.every(
-              (entry) => entry.isBackgroundTask && entry.sourceActivityKind === "task.completed",
-            )
+            ...(visibleGroupedEntries.every(isBackgroundCompletion)
               ? { isBackgroundEvent: true as const }
               : {}),
           });

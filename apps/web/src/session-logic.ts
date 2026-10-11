@@ -1136,6 +1136,10 @@ function extractToolCommand(payload: Record<string, unknown> | null): {
     itemInput?.command,
     itemResult?.command,
     data?.command,
+    // Personal build: Claude's completed steps carry the command only in the
+    // tool input; their detail is "Bash: <command>", which named every
+    // finished command "Bash:".
+    asRecord(data?.input)?.command,
     itemType === "command_execution" && detail ? stripTrailingExitCode(detail).output : null,
   ];
 

@@ -74,6 +74,7 @@ function settledRows(entries: TimelineEntry[], expandedBlockIds: ReadonlySet<str
     activeTurnStartedAt: null,
     turnDiffSummaries: [],
     supportsConversationRollback: false,
+    flatWork: true,
   });
   return applyChatStyleRows(rows, { expandedBlockIds });
 }
@@ -87,6 +88,7 @@ function runningRows(entries: TimelineEntry[], expandedBlockIds: ReadonlySet<str
     activeTurnStartedAt: time(0),
     turnDiffSummaries: [],
     supportsConversationRollback: false,
+    flatWork: true,
   });
   return applyChatStyleRows(rows, { expandedBlockIds });
 }
@@ -180,6 +182,25 @@ describe("applyChatStyleRows", () => {
     expect(rows[4]).toMatchObject({ id: CHAT_TYPING_ROW_ID });
   });
 
+  it("opens a line to one row per step, with no groups inside it", () => {
+    const entries = [
+      message("user", "user", "Check the build", 0),
+      tool("status", "git status", 1),
+      tool("diff", "git diff", 2),
+      tool("test", "vp test run", 3),
+      message("reply", "assistant", "All green.", 4),
+    ];
+    const rows = settledRows(entries, new Set(["chat-work:user"]));
+    expect(rows.map((row) => row.id)).toEqual([
+      "user",
+      "chat-work:user",
+      "status",
+      "diff",
+      "test",
+      "reply",
+    ]);
+  });
+
   it("opens a background event's details right under it", () => {
     const jobDone: TimelineEntry = {
       id: "job-done",
@@ -206,6 +227,7 @@ describe("applyChatStyleRows", () => {
       activeTurnStartedAt: null,
       turnDiffSummaries: [],
       supportsConversationRollback: false,
+      flatWork: true,
     });
     const chat = applyChatStyleRows(rows, { expandedBlockIds: new Set() });
     const event = chat.findIndex((row) => "chatEvent" in row && row.chatEvent);
