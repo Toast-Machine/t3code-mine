@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vite-plus/test";
-import { ApprovalRequestId, MessageId, TurnId } from "@t3tools/contracts";
+import { ApprovalRequestId, CheckpointRef, MessageId, TurnId } from "@t3tools/contracts";
 
 import type { TimelineEntry } from "../../session-logic";
 import { deriveMessagesTimelineRows } from "./MessagesTimeline.logic";
@@ -211,6 +211,60 @@ describe("applyChatStyleRows", () => {
     expect(rows[2]).toMatchObject({ id: "reply" });
     expect(rows[3]).toMatchObject({ toggleId: "chat-work:reply", label: "Worked for 4.0s" });
     expect(rows[4]).toMatchObject({ id: "summary" });
+  });
+
+  describe("when the agent wakes up on its own after answering", () => {
+    // The first turn ended and recorded its answer; a finished background task
+    // then woke the agent, which works on in a turn of its own.
+    const wakeTurn = TurnId.make("turn-2");
+    const finishedFirstTurn = {
+      turnId,
+      checkpointTurnCount: 1,
+      checkpointRef: CheckpointRef.make("refs/t3/checkpoints/turn-1"),
+      status: "missing" as const,
+      files: [],
+      assistantMessageId: MessageId.make("reply"),
+      completedAt: time(5),
+    };
+    const answerAndLiveLine = [
+      "message",
+      "chat-work",
+      "message",
+      "chat-work",
+      "chat-typing",
+    ] as const;
+
+    it("keeps the answer while the wake-up turn works", () => {
+      const rows = deriveMessagesTimelineRows({
+        timelineEntries: [...settledTurn, tool("audit", "cat audit.md", 8, true, wakeTurn)],
+        latestTurn: { turnId: wakeTurn, state: "running", startedAt: time(7), completedAt: null },
+        runningTurnId: wakeTurn,
+        expandedTurnIds: everyTurn,
+        isWorking: true,
+        activeTurnStartedAt: time(7),
+        turnDiffSummaries: [finishedFirstTurn],
+        supportsConversationRollback: false,
+      });
+      const chat = applyChatStyleRows(rows, { expandedBlockIds: new Set() });
+      expect(chat.map((row) => row.kind)).toEqual(answerAndLiveLine);
+      expect(chat[2]).toMatchObject({ id: "reply" });
+      expect(chat[3]).toMatchObject({ id: CHAT_LIVE_WORK_ROW_ID, toggleId: "chat-work:reply" });
+    });
+
+    it("keeps the answer before the wake-up turn has started", () => {
+      const rows = deriveMessagesTimelineRows({
+        timelineEntries: settledTurn,
+        latestTurn: { turnId, state: "completed", startedAt: time(0), completedAt: time(5) },
+        expandedTurnIds: everyTurn,
+        isWorking: true,
+        activeTurnStartedAt: time(7),
+        turnDiffSummaries: [finishedFirstTurn],
+        supportsConversationRollback: false,
+      });
+      const chat = applyChatStyleRows(rows, { expandedBlockIds: new Set() });
+      expect(chat.map((row) => row.kind)).toEqual(answerAndLiveLine);
+      expect(chat[2]).toMatchObject({ id: "reply" });
+    });
   });
 
   it("never treats a note as the answer while the agent is still working", () => {

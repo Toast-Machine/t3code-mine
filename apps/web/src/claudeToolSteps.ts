@@ -26,6 +26,11 @@ const STEPS: Record<string, { label: string; activeLabel: string; field: string 
     field: "query",
   },
   TodoWrite: { label: "Updated tasks", activeLabel: "Updating tasks", field: "" },
+  ScheduleWakeup: {
+    label: "Scheduled a check-in",
+    activeLabel: "Scheduling a check-in",
+    field: "",
+  },
 };
 
 const DETAIL_PATTERN = /^(\w+): (\{[\s\S]*\})$/;

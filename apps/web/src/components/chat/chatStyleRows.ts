@@ -195,7 +195,10 @@ export function applyChatStyleRows(
 
   // Like upstream, while the agent works everything after your latest message
   // is still in progress: a note there is never the answer, even if a turn's
-  // lifecycle lags behind the working state.
+  // lifecycle lags behind the working state. The exception is the answer a
+  // finished turn recorded (its checkpoint): once shown it stays, and work
+  // after it, such as Claude waking up for a background task, starts the next
+  // line.
   const working = rows.some((row) => row.kind === "working");
   const latestUserIndex = rows.findLastIndex(
     (row) => row.kind === "message" && row.message.role === "user",
@@ -225,7 +228,13 @@ export function applyChatStyleRows(
         opener = null;
       }
     }
-    if (working && index > latestUserIndex && row.kind === "message" && isChatAnswerRow(row)) {
+    if (
+      working &&
+      index > latestUserIndex &&
+      row.kind === "message" &&
+      isChatAnswerRow(row) &&
+      !row.assistantTurnDiffSummary
+    ) {
       block.push({ ...row, showAssistantMeta: false, showAssistantCopyButton: false });
       blockTurnId = turnOfRow ?? blockTurnId;
       continue;

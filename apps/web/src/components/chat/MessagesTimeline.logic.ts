@@ -638,6 +638,8 @@ function deriveActiveVisualResponseTurnIds(input: {
   timelineEntries: ReadonlyArray<TimelineEntry>;
   unsettledTurnId: TurnId | null;
   isWorking: boolean;
+  /** Turns with a checkpoint: they ended, so their answer stays an answer. */
+  finishedTurnIds: ReadonlySet<TurnId>;
 }): ReadonlySet<TurnId> {
   const turnIds = new Set<TurnId>();
   if (input.unsettledTurnId === null) {
@@ -652,7 +654,10 @@ function deriveActiveVisualResponseTurnIds(input: {
   const latestUserMessageIndex = lastUserMessageIndex(input.timelineEntries);
   for (let index = latestUserMessageIndex + 1; index < input.timelineEntries.length; index += 1) {
     const turnId = timelineEntryTurnId(input.timelineEntries[index]!);
-    if (turnId !== null) {
+    // Personal build: a turn that already ended (Claude waking up for a
+    // finished background task starts a new turn on its own) is not part of
+    // the running response. A turn cut off by a restart has no checkpoint.
+    if (turnId !== null && !input.finishedTurnIds.has(turnId)) {
       turnIds.add(turnId);
     }
   }
@@ -1035,6 +1040,7 @@ export function deriveMessagesTimelineRows(input: {
     timelineEntries: input.timelineEntries,
     unsettledTurnId,
     isWorking: input.isWorking,
+    finishedTurnIds: new Set(input.turnDiffSummaries.map((summary) => summary.turnId)),
   });
   const foldsByAnchorEntryId = deriveTurnFolds({
     timelineEntries: input.timelineEntries,
