@@ -5,20 +5,31 @@ import * as NodePath from "node:path";
 
 import * as Electron from "electron";
 import * as Effect from "effect/Effect";
+import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
 import { HostProcessPlatform } from "@t3tools/shared/hostProcess";
 
+import * as DesktopAssets from "../../app/DesktopAssets.ts";
 import * as DesktopIpc from "../DesktopIpc.ts";
 import { SET_DOCK_PALETTE_ICON_CHANNEL } from "../channels.ts";
 
-// Personal build: the Dock icon follows the selected color palette. Icons are
-// bundled as resources/palette-icons/<palette>.png; a palette without one
-// falls back to the app's own icon.
+// Personal build: the app icon follows the selected color palette: the Dock on
+// macOS, each window's icon (what the taskbar shows) on Windows and Linux.
+// Icons are bundled as resources/palette-icons/<palette>.png; a palette
+// without one falls back to the app's own icon.
 const PaletteId = Schema.String.check(Schema.isPattern(/^[a-z]{1,32}$/));
 
 export const installDockPaletteIcon = Effect.fn("desktop.ipc.installDockPaletteIcon")(function* () {
   const ipc = yield* DesktopIpc.DesktopIpc;
   const platform = yield* HostProcessPlatform;
+  const iconPaths = yield* (yield* DesktopAssets.DesktopAssets).iconPaths;
+  // The icon windows opened later should get too; null keeps the default.
+  let windowIcon: Electron.NativeImage | null = null;
+  if (platform !== "darwin") {
+    Electron.app.on("browser-window-created", (_event, window) => {
+      if (windowIcon) window.setIcon(windowIcon);
+    });
+  }
   yield* ipc.handle(
     DesktopIpc.makeIpcMethod({
       channel: SET_DOCK_PALETTE_ICON_CHANNEL,
@@ -26,9 +37,23 @@ export const installDockPaletteIcon = Effect.fn("desktop.ipc.installDockPaletteI
       result: Schema.Void,
       handler: (palette) =>
         Effect.sync(() => {
-          if (platform !== "darwin" || !Electron.app.dock) return;
           // oxlint-disable-next-line t3code/no-global-process-runtime -- Electron resources path.
           const iconPath = NodePath.join(process.resourcesPath, "palette-icons", `${palette}.png`);
+          if (platform !== "darwin") {
+            const fallbackPath = Option.getOrNull(
+              platform === "win32" ? iconPaths.ico : iconPaths.png,
+            );
+            const path = NodeFS.existsSync(iconPath) ? iconPath : fallbackPath;
+            if (path === null) return;
+            const image = Electron.nativeImage.createFromPath(path);
+            if (image.isEmpty()) return;
+            windowIcon = image;
+            for (const window of Electron.BrowserWindow.getAllWindows()) {
+              if (!window.isDestroyed()) window.setIcon(image);
+            }
+            return;
+          }
+          if (!Electron.app.dock) return;
           // oxlint-disable-next-line t3code/no-global-process-runtime -- Electron resources path.
           const fallbackPath = NodePath.join(process.resourcesPath, "icon.icns");
           const path = NodeFS.existsSync(iconPath) ? iconPath : fallbackPath;

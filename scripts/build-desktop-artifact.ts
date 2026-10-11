@@ -3669,7 +3669,10 @@ const buildDesktopArtifact = Effect.fn("buildDesktopArtifact")(function* (
       ? path.join(stageAppDir, WINDOWS_SERVER_RESOURCE_SOURCE_DIR, WINDOWS_SERVER_ASAR_RESOURCE)
       : undefined;
   const stagePackageJson: StagePackageJson = {
-    name: "t3code",
+    // Personal build: Windows installs into a folder named after this (and the
+    // updater caches downloads under it), so sharing upstream's "t3code" would
+    // install over the official app.
+    name: "t3code-mine",
     version: appVersion,
     buildVersion: appVersion,
     t3codeCommitHash: commitHash,
