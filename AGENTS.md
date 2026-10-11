@@ -1,6 +1,6 @@
-> **Personal fork.** This checkout is the maintainer's personal build, "T3 Code (Mine)": upstream
-> T3 Code with his design on top, moved onto each stable release. See
-> [FORK.md](./FORK.md) for the idea and how to build, install, and update it.
+> **Fork.** This is "T3 Code (Mine)": upstream T3 Code with a redesign on top, moved onto
+> each stable release. If this checkout has a `FORK.md` (the maintainer's local notes), read
+> it first.
 
 # T3 Code
 
@@ -90,9 +90,10 @@ The most common defect in this repo is a change that works on the path you teste
 
 ## Test data
 
-> **Personal build:** this fork overrides the section below. Never copy the maintainer's real
-> data; test in a fake seeded environment and never start a real agent turn. See the
-> Preview section of [FORK.md](./FORK.md).
+> **Fork:** this fork overrides the section below. Never copy real data: a copied
+> database that marks a chat as running makes the dev server resume it, with real provider
+> sessions and credits. Seed a fake environment instead (`seedShowcaseEnvironment` in
+> `scripts/mobile-showcase-environment.ts`) and never start a real agent turn.
 
 An empty database is a bad test. Seed your worktree's `.t3` with a copy of real data instead of pointing at live state:
 
