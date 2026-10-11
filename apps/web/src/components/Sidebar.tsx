@@ -203,6 +203,7 @@ import {
 } from "./Sidebar.drag";
 import { SidebarDragLifecycle, SidebarPointerSensor } from "./Sidebar.pointer";
 import { createSidebarListMotion } from "./Sidebar.motion";
+import { getVisibleSidebarGroupThreads } from "./Sidebar.visibility";
 import {
   ThreadPullRequestsMiniList,
   ThreadWorktreeIndicator,
@@ -257,7 +258,6 @@ const SETTLED_TAIL_PAGE_COUNT = 25;
 // Fresh keys deliberately reset both shelves to collapsed for existing users.
 const SETTLED_SHELF_EXPANDED_KEY = "t3code:sidebar:settled-expanded";
 const SNOOZED_SHELF_EXPANDED_KEY = "t3code:sidebar:snoozed-expanded";
-const WORKING_SHELF_EXPANDED_KEY = "t3code:sidebar:working-expanded";
 
 // Working beta: when this client saw each thread leave the Working shelf.
 // Module scope keeps the inbox order across routes that unmount the sidebar.
@@ -2815,27 +2815,25 @@ export default function Sidebar() {
     return routeThread === undefined ? EMPTY_THREADS : [routeThread];
   }, [routeThreadKey, snoozedShelfExpanded, snoozedThreads]);
 
-  // The Working shelf (beta) collapses the same way, with the same route
-  // exception: sending a message folds the open thread into the shelf, and
-  // its row must stay visible there.
-  const [workingShelfExpanded, setWorkingShelfExpanded] = useLocalStorage(
-    WORKING_SHELF_EXPANDED_KEY,
-    false,
-    Schema.Boolean,
+  const [collapsedGroups, setCollapsedGroups] = useState<ReadonlySet<string>>(() => {
+    try {
+      const raw = window.localStorage.getItem(COLLAPSED_GROUPS_STORAGE_KEY);
+      return new Set(raw ? (JSON.parse(raw) as string[]) : []);
+    } catch {
+      return new Set();
+    }
+  });
+  const workingGroupCollapsed = collapsedGroups.has("working");
+  const visibleWorkingThreads = useMemo(
+    () =>
+      getVisibleSidebarGroupThreads({
+        threads: workingThreads,
+        collapsed: workingGroupCollapsed,
+        routeThreadKey,
+        threadKey: (thread) => scopedThreadKey(scopeThreadRef(thread.environmentId, thread.id)),
+      }),
+    [routeThreadKey, workingGroupCollapsed, workingThreads],
   );
-  const toggleWorkingShelf = useCallback(
-    () => setWorkingShelfExpanded((value) => !value),
-    [setWorkingShelfExpanded],
-  );
-  const visibleWorkingThreads = useMemo(() => {
-    if (workingShelfExpanded) return workingThreads;
-    if (routeThreadKey === null) return EMPTY_THREADS;
-    const routeThread = workingThreads.find(
-      (thread) =>
-        scopedThreadKey(scopeThreadRef(thread.environmentId, thread.id)) === routeThreadKey,
-    );
-    return routeThread === undefined ? EMPTY_THREADS : [routeThread];
-  }, [routeThreadKey, workingShelfExpanded, workingThreads]);
 
   const orderedThreads = useMemo(
     () => [
@@ -3438,14 +3436,6 @@ export default function Sidebar() {
   // A thread needs you when its turn finished unread, it is waiting on an
   // approval or input, or it failed. Same rules the rows use for their fill.
   const lastVisitedAtByKey = useUiStateStore((state) => state.threadLastVisitedAtById);
-  const [collapsedGroups, setCollapsedGroups] = useState<ReadonlySet<string>>(() => {
-    try {
-      const raw = window.localStorage.getItem(COLLAPSED_GROUPS_STORAGE_KEY);
-      return new Set(raw ? (JSON.parse(raw) as string[]) : []);
-    } catch {
-      return new Set();
-    }
-  });
   const toggleGroup = useCallback((group: string) => {
     setCollapsedGroups((current) => {
       const next = new Set(current);
@@ -3495,12 +3485,12 @@ export default function Sidebar() {
     // A collapsed group keeps only the open thread, like the Snoozed and
     // Settled shelves, and leaves the list here so row motion sees it.
     const unlessCollapsed = (list: readonly EnvironmentThreadShell[], group: string) =>
-      collapsedGroups.has(group)
-        ? list.filter(
-            (thread) =>
-              scopedThreadKey(scopeThreadRef(thread.environmentId, thread.id)) === routeThreadKey,
-          )
-        : list;
+      getVisibleSidebarGroupThreads({
+        threads: list,
+        collapsed: collapsedGroups.has(group),
+        routeThreadKey,
+        threadKey: (thread) => scopedThreadKey(scopeThreadRef(thread.environmentId, thread.id)),
+      });
     const items: SidebarListItem[] = [{ kind: "marker", marker: "pinned-header" }];
     const pinnedRows = rowsOf(unlessCollapsed(pinnedThreads, "pinned"), "pinned");
     items.push(...pinnedRows);
@@ -3512,7 +3502,7 @@ export default function Sidebar() {
     items.push(...rowsOf(unlessCollapsed(needsYou, "needs-you"), "active"));
     if (workingThreads.length > 0) {
       items.push({ kind: "marker", marker: "working-header" });
-      items.push(...rowsOf(unlessCollapsed(workingThreads, "working"), "working"));
+      items.push(...rowsOf(visibleWorkingThreads, "working"));
     }
     items.push({ kind: "marker", marker: "active-placeholder" });
     items.push(...rowsOf(unlessCollapsed(open, "open"), "active"));
@@ -3534,6 +3524,7 @@ export default function Sidebar() {
     settledThreads.length,
     snoozedThreads.length,
     visibleSnoozedThreads,
+    visibleWorkingThreads,
     threadNeedsYou,
     workingThreads,
   ]);
