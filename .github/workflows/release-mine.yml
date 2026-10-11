@@ -4,15 +4,25 @@ name: Release T3 Code (Mine)
 # publishes it as a GitHub Release of this repository. Run it by hand
 # (Actions > Release T3 Code (Mine) > Run workflow) on the commit to ship.
 #
-# The version comes from apps/desktop/package.json, which follows upstream's
-# version, and the release is tagged v<version>. Windows builds point their
-# built-in updater at this repository's releases, so installed copies offer
+# Versions: the app's packages keep upstream's version (what servers and
+# clients compare), while the desktop app, its installers, and the update feed
+# use the fork's own number: upstream's major and minor, then upstream's patch
+# times 100 plus the fork's release on it. 0.0.4502 is the fork's second
+# release on upstream 0.0.45, and 1.2.4501 its first on 1.2.45. It always goes
+# up, so the updater offers fixes between upstream releases. The release is
+# tagged v<version>. Windows builds point their built-in updater at this
+# repository's releases, so installed copies offer
 # each new release. Mac builds are unsigned until a Developer ID certificate
 # is set up, and macOS only auto-updates signed apps, so they ship without an
 # update feed and are installed by hand.
 
 on:
   workflow_dispatch:
+    inputs:
+      version:
+        description: "Fork version: upstream's, with the patch times 100 plus the fork release (0.0.4501 is the first on 0.0.45)"
+        required: true
+        type: string
 
 concurrency:
   group: release-mine
@@ -30,12 +40,24 @@ jobs:
     steps:
       - uses: actions/checkout@v6
         with:
-          sparse-checkout: apps/desktop/package.json
+          sparse-checkout: apps/server/package.json
           sparse-checkout-cone-mode: false
 
-      - name: Read version
+      # The version must encode the upstream release the code is on.
+      - name: Check the version
         id: version
-        run: echo "version=$(node -p 'require("./apps/desktop/package.json").version')" >> "$GITHUB_OUTPUT"
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          upstream="$(node -p 'require("./apps/server/package.json").version')"
+          IFS=. read -r major minor patch <<< "$upstream"
+          if [[ ! "$VERSION" =~ ^([0-9]+)\.([0-9]+)\.([0-9]+)$ ]] ||
+            [[ "${BASH_REMATCH[1]}" != "$major" || "${BASH_REMATCH[2]}" != "$minor" ]] ||
+            (( BASH_REMATCH[3] / 100 != patch || BASH_REMATCH[3] % 100 == 0 )); then
+            echo "::error::This code is on upstream $upstream, so the version must be $major.$minor.$((patch * 100 + 1)) for the first release on it, then $major.$minor.$((patch * 100 + 2)), and so on."
+            exit 1
+          fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
 
       # The updater only offers a higher version, so republishing one would
       # reach nobody. Refuse early instead of after the builds.
