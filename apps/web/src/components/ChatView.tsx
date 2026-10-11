@@ -9872,6 +9872,10 @@ export default function ChatView(props: ChatViewProps) {
                 isPreparingWorktree={!paintOnlyDisplayedTimeline && isPreparingWorktree}
                 isCompacting={!paintOnlyDisplayedTimeline && isCompacting}
                 liveWorkLine={activeLiveWorkLine}
+                isAwaitingInput={
+                  !paintOnlyDisplayedTimeline &&
+                  (pendingApprovals.length > 0 || pendingUserInputs.length > 0)
+                }
                 activeTurnStartedAt={paintOnlyDisplayedTimeline ? null : activeWorkStartedAt}
                 worktreeSetup={paintOnlyDisplayedTimeline ? null : worktreeSetup}
                 onCancelWorktreeSetup={onCancelWorktreeSetup}

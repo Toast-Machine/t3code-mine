@@ -14,6 +14,7 @@
 // The timeline hands this pass every row (no upstream folds), and the lines'
 // open state lives in the existing per-group expansion set, keyed by the
 // message that opened each block.
+import { hasQuestionAnswer } from "@t3tools/client-runtime/work-log/user-input";
 import { formatDuration } from "@t3tools/shared/orchestrationTiming";
 
 import type { MessagesTimelineRow } from "./MessagesTimeline.logic";
@@ -23,9 +24,15 @@ export const CHAT_TYPING_ROW_ID = "chat-typing-row";
 
 type Row = MessagesTimelineRow;
 
-/** Your answer to a question the agent asked; shown as a reply. */
-export const isQuestionReplyRow = (row: Row): row is Extract<Row, { kind: "work" }> =>
-  row.kind === "work" && row.groupedEntries.length === 1 && !!row.groupedEntries[0]!.questionAnswer;
+/**
+ * Your answer to a question the agent asked; shown as a reply. A question still
+ * waiting on you (or one you dismissed) is the agent's, so it stays in its work.
+ */
+export const isQuestionReplyRow = (row: Row): row is Extract<Row, { kind: "work" }> => {
+  if (row.kind !== "work" || row.groupedEntries.length !== 1) return false;
+  const answer = row.groupedEntries[0]!.questionAnswer;
+  return answer !== undefined && hasQuestionAnswer(answer);
+};
 
 const isBackgroundEventRow = (row: Row): row is Extract<Row, { kind: "work-toggle" }> =>
   row.kind === "work-toggle" && !!row.isBackgroundEvent;

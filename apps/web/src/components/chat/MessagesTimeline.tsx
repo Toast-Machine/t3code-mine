@@ -312,6 +312,7 @@ interface TimelineRowActivityState {
   isCompacting: boolean;
   /** What the agent is doing now (liveWorkLine.ts), for the live work line. */
   liveWorkLine: string;
+  isAwaitingInput: boolean;
   isRevertingCheckpoint: boolean;
   latestTurnId: TurnId | null;
   unsettledTurnId: TurnId | null;
@@ -413,6 +414,8 @@ interface MessagesTimelineProps {
   isCompacting?: boolean;
   /** Personal build: what the agent is doing now, the same line the sidebar shows. */
   liveWorkLine?: string | undefined;
+  /** The agent is paused on a question or approval for the user. */
+  isAwaitingInput?: boolean;
   activeTurnStartedAt: string | null;
   /** Live bootstrap progress for this thread, or null when none is tracked. */
   worktreeSetup?: WorktreeSetupSnapshot | null;
@@ -494,6 +497,7 @@ export const MessagesTimeline = memo(function MessagesTimeline({
   isPreparingWorktree = false,
   isCompacting = false,
   liveWorkLine = "Thinking",
+  isAwaitingInput = false,
   activeTurnStartedAt,
   agentPanelModel,
   onOpenAgents = NOOP_OPEN_AGENTS,
@@ -1258,6 +1262,7 @@ export const MessagesTimeline = memo(function MessagesTimeline({
       isPreparingWorktree,
       isCompacting,
       liveWorkLine,
+      isAwaitingInput,
       isRevertingCheckpoint,
       latestTurnId: latestTurn?.turnId ?? null,
       // The same value the row-derivation uses, so a block and the placeholder
@@ -1267,6 +1272,7 @@ export const MessagesTimeline = memo(function MessagesTimeline({
     }),
     [
       backgroundWorktreeSetup,
+      isAwaitingInput,
       isCompacting,
       liveWorkLine,
       isRevertingCheckpoint,
@@ -2682,8 +2688,13 @@ function ProposedPlanTimelineRow({
 // hides the turn's work right below it.
 function ChatWorkTimelineRow({ row }: { row: Extract<TimelineRow, { kind: "chat-work" }> }) {
   const ctx = use(TimelineRowCtx);
-  const { isCompacting, isPreparingWorktree, backgroundWorktreeSetup, liveWorkLine } =
-    use(TimelineRowActivityCtx);
+  const {
+    isCompacting,
+    isAwaitingInput,
+    isPreparingWorktree,
+    backgroundWorktreeSetup,
+    liveWorkLine,
+  } = use(TimelineRowActivityCtx);
   // Compacting writes nothing, so it reads as a centered event, not the agent's work.
   if (row.live && isCompacting && !isPreparingWorktree) {
     return (
@@ -2698,6 +2709,8 @@ function ChatWorkTimelineRow({ row }: { row: Extract<TimelineRow, { kind: "chat-
     content = <span>{row.label}</span>;
   } else if (isPreparingWorktree) {
     content = <span>Setting up worktree…</span>;
+  } else if (isAwaitingInput) {
+    content = <span>Waiting for you</span>;
   } else {
     content = (
       <>
@@ -2730,10 +2743,11 @@ function ChatWorkTimelineRow({ row }: { row: Extract<TimelineRow, { kind: "chat-
 }
 
 // Personal build: while the agent works, a typing bubble sits where its answer
-// will appear. Compacting writes no answer, so it gets none.
+// will appear. Compacting writes no answer, and an agent waiting on you isn't
+// typing, so neither gets one.
 function ChatTypingTimelineRow() {
-  const { isCompacting } = use(TimelineRowActivityCtx);
-  if (isCompacting) return null;
+  const { isCompacting, isAwaitingInput } = use(TimelineRowActivityCtx);
+  if (isCompacting || isAwaitingInput) return null;
   return (
     <div className="mt-2 flex w-fit items-center rounded-2xl rounded-bl-md bg-accent px-4 py-3">
       <TypingDots />

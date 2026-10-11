@@ -144,6 +144,19 @@ describe("applyChatStyleRows", () => {
     expect(rows[3]).toMatchObject({ toggleId: "chat-work:question" });
   });
 
+  it("keeps a question still waiting on you in the agent's work, not as your reply", () => {
+    const pending: TimelineEntry = {
+      ...question,
+      entry: {
+        ...question.entry,
+        questionAnswer: { ...question.entry.questionAnswer!, answers: {} },
+      },
+    } as TimelineEntry;
+    const rows = runningRows([settledTurn[0]!, tool("read", "cat ZoomBar.tsx", 1), pending]);
+    expect(rows.map((row) => row.kind)).toEqual(["message", "chat-work", "chat-typing"]);
+    expect(rows.some((row) => "chatReply" in row && row.chatReply)).toBe(false);
+  });
+
   it("closes a line when you send a message mid-turn, and keeps the newest one live", () => {
     const entries = [
       ...settledTurn.slice(0, 3),
