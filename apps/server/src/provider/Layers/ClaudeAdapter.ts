@@ -3673,10 +3673,13 @@ export const makeClaudeAdapter = Effect.fn("makeClaudeAdapter")(function* (
     // error rows in client work logs. `vcs_state_changed`
     // ({kind: commit|push|rebase}) and `code_change_published`
     // ({provider, url, repo}) are informational CLI notices; the work log
-    // already shows the underlying git/gh tool calls.
+    // already shows the underlying git/gh tool calls. Personal build:
+    // `session_title_changed` is Claude naming its own session; T3 Code titles
+    // threads itself, so it's noise in the chat.
     switch (message.subtype as string) {
       case "vcs_state_changed":
       case "code_change_published":
+      case "session_title_changed":
         return;
     }
 
