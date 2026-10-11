@@ -106,6 +106,17 @@ export function deriveChatWorkStatus(rows: ReadonlyArray<Row>): ChatWorkStatus {
   return THINKING;
 }
 
+// A message sent mid-step closes that step's line, but the step keeps running
+// until the agent gets to the message: name it until the new line has work.
+function liveStatus(block: ReadonlyArray<Row>, interrupted: ReadonlyArray<Row>): ChatWorkStatus {
+  const status = deriveChatWorkStatus(block);
+  if (status.kind !== "thinking") return status;
+  const before = deriveChatWorkStatus(interrupted);
+  return before.kind === "tool" && before.entry.toolLifecycleStatus === "inProgress"
+    ? before
+    : status;
+}
+
 // The step still running, not whatever landed last: a background job from an
 // earlier turn stopping mid-turn isn't what the agent is doing now.
 function liveEntry(entries: ReadonlyArray<WorkLogEntry>): WorkLogEntry | undefined {
@@ -142,6 +153,8 @@ export function applyChatStyleRows(
   // on its own: a turn the agent starts without you (a Codex continuation)
   // never folds into the line above the previous turn's answer.
   let blockTurnId: string | null = null;
+  // The work your latest message cut into, for a step it left running.
+  let interruptedBlock: Row[] = [];
 
   const toggleIdFor = (first: Row) => `chat-work:${opener?.id ?? first.id}`;
 
@@ -196,7 +209,7 @@ export function applyChatStyleRows(
       expanded,
       live: true,
       label: "",
-      status: deriveChatWorkStatus(block),
+      status: liveStatus(block, interruptedBlock),
     });
     if (expanded) result.push(...block);
     result.push({ kind: "chat-typing", id: CHAT_TYPING_ROW_ID, createdAt: live.createdAt });
@@ -276,8 +289,13 @@ export function applyChatStyleRows(
       continue;
     }
     // Something was said or happened: the work so far closes into its own line.
-    if (pendingAnswer) flushAnswer();
-    else closeBlock(row.createdAt);
+    if (pendingAnswer) {
+      flushAnswer();
+      interruptedBlock = [];
+    } else {
+      interruptedBlock = block;
+      closeBlock(row.createdAt);
+    }
     if (isQuestionReplyRow(row)) result.push({ ...row, chatReply: true });
     else if (isBackgroundEventRow(row)) result.push({ ...row, chatEvent: true });
     else result.push(row);

@@ -2717,7 +2717,7 @@ function ChatWorkTimelineRow({ row }: { row: Extract<TimelineRow, { kind: "chat-
         aria-expanded={row.expanded}
         data-scroll-anchor-ignore
         onClick={() => ctx.onToggleWorkGroup(row.toggleId, row.id)}
-        className="-mx-1.5 flex min-w-0 cursor-pointer select-none items-center gap-2 rounded-md px-1.5 py-0.5 text-muted-foreground text-xs tabular-nums transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/70"
+        className="-mx-1.5 flex min-w-0 cursor-pointer select-none items-center gap-2 rounded-md px-1.5 py-0.5 text-muted-foreground text-xs tabular-nums transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/70"
       >
         {content}
         <Icon className="size-3.5 shrink-0" />
@@ -2772,7 +2772,7 @@ function ChatEventTimelineRow({ row }: { row: Extract<TimelineRow, { kind: "work
         type="button"
         aria-expanded={row.expanded}
         onClick={() => ctx.onToggleWorkGroup(row.groupId, row.id)}
-        className="max-w-[80%] cursor-pointer truncate rounded-full px-3 py-0.5 text-muted-foreground text-xs transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/70"
+        className="max-w-[80%] cursor-pointer truncate rounded-full px-3 py-0.5 text-muted-foreground text-xs transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/70"
       >
         {row.summary}
       </button>

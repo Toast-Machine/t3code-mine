@@ -195,6 +195,22 @@ describe("applyChatStyleRows", () => {
     });
   });
 
+  it("keeps naming a step still running when you send a message mid-step", () => {
+    const entries = [
+      message("user", "user", "Search the archives", 0),
+      tool("search", "curl archive.org", 1, true),
+      message("steer", "user", "Is it only 304?", 2),
+    ];
+    expect(runningRows(entries).find((row) => row.id === CHAT_LIVE_WORK_ROW_ID)).toMatchObject({
+      toggleId: "chat-work:steer",
+      status: { kind: "tool", entry: { id: "search" } },
+    });
+    const finished = [...entries.slice(0, 1), tool("search", "curl archive.org", 1), entries[2]!];
+    expect(runningRows(finished).find((row) => row.id === CHAT_LIVE_WORK_ROW_ID)).toMatchObject({
+      status: { kind: "thinking" },
+    });
+  });
+
   it("keeps a live line's open state when the turn settles", () => {
     const open = new Set(["chat-work:user"]);
     const running = runningRows(
